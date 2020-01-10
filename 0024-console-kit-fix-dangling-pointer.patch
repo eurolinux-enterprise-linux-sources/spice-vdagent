@@ -1,0 +1,25 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Victor Toso <victortoso@redhat.com>
+Date: Tue, 3 May 2016 11:19:30 +0200
+Subject: [PATCH] console-kit: fix dangling pointer
+
+Introduced recently by b1b8b71961b9a28cc4896e9973d3a3c1975ead39
+
+Acked-by: Jonathon Jongsma <jjongsma@redhat.com>
+(cherry picked from commit 0064dca2dd5dc63987110a82bfde7892b52255ea)
+---
+ src/console-kit.c | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/src/console-kit.c b/src/console-kit.c
+index ee956d6..4f81a66 100644
+--- a/src/console-kit.c
++++ b/src/console-kit.c
+@@ -95,6 +95,7 @@ static void si_dbus_match_rule_update(struct session_info *info)
+                    error.message);
+             dbus_error_free(&error);
+             g_free(info->match_seat_signals);
++            info->match_seat_signals = NULL;
+         }
+     }
+ }

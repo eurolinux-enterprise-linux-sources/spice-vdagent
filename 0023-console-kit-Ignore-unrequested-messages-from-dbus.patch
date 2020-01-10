@@ -1,0 +1,45 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Victor Toso <victortoso@redhat.com>
+Date: Tue, 3 May 2016 11:17:20 +0200
+Subject: [PATCH] console-kit: Ignore unrequested messages from dbus
+
+Instead of treating them as errors.
+
+Acked-by: Jonathon Jongsma <jjongsma@redhat.com>
+(cherry picked from commit 691893864f14fbf75f8684359f13c2c5c4a93c07)
+---
+ src/console-kit.c | 14 ++++++--------
+ 1 file changed, 6 insertions(+), 8 deletions(-)
+
+diff --git a/src/console-kit.c b/src/console-kit.c
+index fc7739e..ee956d6 100644
+--- a/src/console-kit.c
++++ b/src/console-kit.c
+@@ -109,12 +109,6 @@ si_dbus_read_signals(struct session_info *info)
+     while (message != NULL) {
+         const char *member;
+ 
+-        if (dbus_message_get_type(message) != DBUS_MESSAGE_TYPE_SIGNAL) {
+-            syslog(LOG_WARNING, "(console-kit) received non signal message");
+-            dbus_message_unref(message);
+-            break;
+-        }
+-
+         member = dbus_message_get_member (message);
+         if (g_strcmp0(member, SEAT_SIGNAL_ACTIVE_SESSION_CHANGED) == 0) {
+             DBusMessageIter iter;
+@@ -142,8 +136,12 @@ si_dbus_read_signals(struct session_info *info)
+                        "ActiveSessionChanged message has unexpected type: '%c'",
+                        type);
+             }
+-        } else if (info->verbose) {
+-            syslog(LOG_DEBUG, "(console-kit) Signal not handled: %s", member);
++        } else {
++            if (dbus_message_get_type(message) != DBUS_MESSAGE_TYPE_SIGNAL) {
++                syslog(LOG_WARNING, "(console-kit) received non signal message");
++            } else if (info->verbose) {
++                syslog(LOG_DEBUG, "(console-kit) Signal not handled: %s", member);
++            }
+         }
+ 
+         dbus_message_unref(message);

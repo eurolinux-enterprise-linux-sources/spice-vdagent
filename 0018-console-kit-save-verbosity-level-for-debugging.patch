@@ -1,0 +1,50 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Victor Toso <victortoso@redhat.com>
+Date: Tue, 12 Apr 2016 09:34:10 +0200
+Subject: [PATCH] console-kit: save verbosity level for debugging
+
+Signed-off-by: Victor Toso <victortoso@redhat.com>
+Acked-by: Jonathon Jongsma <jjongsma@redhat.com>
+(cherry picked from commit 15052a375b2149222d73d3fd8a703e7cfcc65be3)
+---
+ src/console-kit.c | 7 +++++++
+ 1 file changed, 7 insertions(+)
+
+diff --git a/src/console-kit.c b/src/console-kit.c
+index 64aacca..0bc6c52 100644
+--- a/src/console-kit.c
++++ b/src/console-kit.c
+@@ -32,6 +32,7 @@ struct session_info {
+     int fd;
+     char *seat;
+     char *active_session;
++    int verbose;
+ };
+ 
+ #define INTERFACE_CONSOLE_KIT "org.freedesktop.ConsoleKit"
+@@ -55,6 +56,8 @@ struct session_info *session_info_create(int verbose)
+     if (!info)
+         return NULL;
+ 
++    info->verbose = verbose;
++
+     dbus_error_init(&error);
+     info->connection = dbus_bus_get_private(DBUS_BUS_SYSTEM, &error);
+     if (info->connection == NULL || dbus_error_is_set(&error)) {
+@@ -172,6 +175,7 @@ exit:
+             dbus_message_unref(message);
+     }
+ 
++    syslog(LOG_INFO, "(console-kit) seat: %s", info->seat);
+     return info->seat;
+ }
+ 
+@@ -360,5 +364,8 @@ static char *console_kit_check_active_session_change(struct session_info *info)
+         dbus_connection_read_write(info->connection, 0);
+     }
+ 
++    if (info->verbose)
++        syslog(LOG_DEBUG, "(console-kit) active-session: '%s'",
++               (info->active_session ? info->active_session : "None"));
+     return info->active_session;
+ }

@@ -1,0 +1,308 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Victor Toso <victortoso@redhat.com>
+Date: Sat, 9 Apr 2016 12:00:08 +0200
+Subject: [PATCH] session-info: check for a locked session
+
+Each session back-end can return this information to vdagentd when
+requested.
+
+The agent should use this on situations that should not work when
+session is locked such as file-transfer-start which is fixed by this
+patch.
+
+systemd-login is the only back-end implementing this function at the
+moment and I'll address console-kit back-end in a later patch.
+
+Also, this patch makes spice-vdagent depend on dbus for getting the
+lock information.
+
+Resolve: https://bugzilla.redhat.com/show_bug.cgi?id=1323623
+
+Acked-by: Jonathon Jongsma <jjongsma@redhat.com>
+(cherry picked from commit 364b6bba068bd694d7c4355b6275f88482d9f3f8)
+---
+ configure.ac             |  17 ++-----
+ src/console-kit.c        |   7 +++
+ src/dummy-session-info.c |   5 ++
+ src/session-info.h       |   3 ++
+ src/systemd-login.c      | 127 +++++++++++++++++++++++++++++++++++++++++++++++
+ src/vdagentd.c           |   7 +++
+ 6 files changed, 153 insertions(+), 13 deletions(-)
+
+diff --git a/configure.ac b/configure.ac
+index 7be379c..2c09855 100644
+--- a/configure.ac
++++ b/configure.ac
+@@ -80,6 +80,7 @@ AC_ARG_ENABLE([static-uinput],
+ PKG_CHECK_MODULES([GLIB2], [glib-2.0 >= 2.12])
+ PKG_CHECK_MODULES(X, [xfixes xrandr >= 1.3 xinerama x11])
+ PKG_CHECK_MODULES(SPICE, [spice-protocol >= 0.12.5])
++PKG_CHECK_MODULES([DBUS], [dbus-1])
+ 
+ if test "$with_session_info" = "auto" || test "$with_session_info" = "systemd"; then
+     PKG_CHECK_MODULES([LIBSYSTEMD_LOGIN],
+@@ -99,19 +100,9 @@ fi
+ AM_CONDITIONAL(HAVE_LIBSYSTEMD_LOGIN, test x"$have_libsystemd_login" = "xyes")
+ 
+ if test "$with_session_info" = "auto" || test "$with_session_info" = "console-kit"; then
+-    PKG_CHECK_MODULES([DBUS],
+-                      [dbus-1],
+-                      [have_console_kit="yes"],
+-                      [have_console_kit="no"])
+-    if test x"$have_console_kit" = "xno" && test "$with_session_info" = "console-kit"; then
+-        AC_MSG_ERROR([console-kit support explicitly requested, but some required packages are not available])
+-    fi
+-    if test x"$have_console_kit" = "xyes"; then
+-        AC_DEFINE([HAVE_CONSOLE_KIT], [1], [If defined, vdagentd will be compiled with ConsoleKit support])
+-        with_session_info="console-kit"
+-    else
+-        with_session_info="none"
+-    fi
++    AC_DEFINE([HAVE_CONSOLE_KIT], [1], [If defined, vdagentd will be compiled with ConsoleKit support])
++    have_console_kit="yes"
++    with_session_info="console-kit"
+ else
+     have_console_kit="no"
+ fi
+diff --git a/src/console-kit.c b/src/console-kit.c
+index 4f81a66..1d42f48 100644
+--- a/src/console-kit.c
++++ b/src/console-kit.c
+@@ -415,3 +415,10 @@ static char *console_kit_check_active_session_change(struct session_info *info)
+ 
+     return info->active_session;
+ }
++
++gboolean session_info_session_is_locked(struct session_info *info)
++{
++    /* TODO: It could be implemented based on Lock/Unlock signals from Session
++     * interface. */
++    return FALSE;
++}
+diff --git a/src/dummy-session-info.c b/src/dummy-session-info.c
+index e188ddc..c09643b 100644
+--- a/src/dummy-session-info.c
++++ b/src/dummy-session-info.c
+@@ -44,3 +44,8 @@ char *session_info_session_for_pid(struct session_info *si, uint32_t pid)
+ {
+     return NULL;
+ }
++
++gboolean session_is_locked(struct session_info *ck)
++{
++    return FALSE;
++}
+diff --git a/src/session-info.h b/src/session-info.h
+index 67099de..d660fcf 100644
+--- a/src/session-info.h
++++ b/src/session-info.h
+@@ -24,6 +24,7 @@
+ 
+ #include <stdio.h>
+ #include <stdint.h>
++#include <glib.h>
+ 
+ struct session_info;
+ 
+@@ -36,4 +37,6 @@ const char *session_info_get_active_session(struct session_info *ck);
+ /* Note result must be free()-ed by caller */
+ char *session_info_session_for_pid(struct session_info *ck, uint32_t pid);
+ 
++gboolean session_info_session_is_locked(struct session_info *si);
++
+ #endif
+diff --git a/src/systemd-login.c b/src/systemd-login.c
+index 73db37f..4a365c0 100644
+--- a/src/systemd-login.c
++++ b/src/systemd-login.c
+@@ -25,13 +25,121 @@
+ #include <string.h>
+ #include <syslog.h>
+ #include <systemd/sd-login.h>
++#include <dbus/dbus.h>
+ 
+ struct session_info {
+     int verbose;
+     sd_login_monitor *mon;
+     char *session;
++    struct {
++        DBusConnection *system_connection;
++        char *match_session_signals;
++    } dbus;
++    gboolean session_is_locked;
+ };
+ 
++#define LOGIND_SESSION_INTERFACE    "org.freedesktop.login1.Session"
++#define LOGIND_SESSION_OBJ_TEMPLATE "'/org/freedesktop/login1/session/_3%s'"
++
++#define SESSION_SIGNAL_LOCK         "Lock"
++#define SESSION_SIGNAL_UNLOCK       "Unlock"
++
++/* dbus related */
++static DBusConnection *si_dbus_get_system_bus(void)
++{
++    DBusConnection *connection;
++    DBusError error;
++
++    dbus_error_init(&error);
++    connection = dbus_bus_get_private(DBUS_BUS_SYSTEM, &error);
++    if (connection == NULL || dbus_error_is_set(&error)) {
++        if (dbus_error_is_set(&error)) {
++            syslog(LOG_WARNING, "Unable to connect to system bus: %s",
++                   error.message);
++            dbus_error_free(&error);
++        } else {
++            syslog(LOG_WARNING, "Unable to connect to system bus");
++        }
++        return NULL;
++    }
++    return connection;
++}
++
++static void si_dbus_match_remove(struct session_info *si)
++{
++    DBusError error;
++    if (si->dbus.match_session_signals == NULL)
++        return;
++
++    dbus_error_init(&error);
++    dbus_bus_remove_match(si->dbus.system_connection,
++                          si->dbus.match_session_signals,
++                          &error);
++
++    g_free(si->dbus.match_session_signals);
++    si->dbus.match_session_signals = NULL;
++}
++
++static void si_dbus_match_rule_update(struct session_info *si)
++{
++    DBusError error;
++
++    if (si->dbus.system_connection == NULL ||
++            si->session == NULL)
++        return;
++
++    si_dbus_match_remove(si);
++
++    si->dbus.match_session_signals =
++        g_strdup_printf ("type='signal',interface='%s',path="
++                         LOGIND_SESSION_OBJ_TEMPLATE,
++                         LOGIND_SESSION_INTERFACE,
++                         si->session);
++    if (si->verbose)
++        syslog(LOG_DEBUG, "logind match: %s", si->dbus.match_session_signals);
++
++    dbus_error_init(&error);
++    dbus_bus_add_match(si->dbus.system_connection,
++                       si->dbus.match_session_signals,
++                       &error);
++    if (dbus_error_is_set(&error)) {
++        syslog(LOG_WARNING, "Unable to add dbus rule match: %s",
++               error.message);
++        dbus_error_free(&error);
++        g_free(si->dbus.match_session_signals);
++        si->dbus.match_session_signals = NULL;
++    }
++}
++
++static void
++si_dbus_read_signals(struct session_info *si)
++{
++    DBusMessage *message = NULL;
++
++    dbus_connection_read_write(si->dbus.system_connection, 0);
++    message = dbus_connection_pop_message(si->dbus.system_connection);
++    while (message != NULL) {
++        const char *member;
++
++        member = dbus_message_get_member (message);
++        if (g_strcmp0(member, SESSION_SIGNAL_LOCK) == 0) {
++            si->session_is_locked = TRUE;
++        } else if (g_strcmp0(member, SESSION_SIGNAL_UNLOCK) == 0) {
++            si->session_is_locked = FALSE;
++        } else {
++            if (dbus_message_get_type(message) != DBUS_MESSAGE_TYPE_SIGNAL) {
++                syslog(LOG_WARNING, "(systemd-login) received non signal message");
++            } else if (si->verbose) {
++                syslog(LOG_DEBUG, "(systemd-login) Signal not handled: %s", member);
++            }
++        }
++
++        dbus_message_unref(message);
++        dbus_connection_read_write(si->dbus.system_connection, 0);
++        message = dbus_connection_pop_message(si->dbus.system_connection);
++    }
++}
++
+ struct session_info *session_info_create(int verbose)
+ {
+     struct session_info *si;
+@@ -42,6 +150,7 @@ struct session_info *session_info_create(int verbose)
+         return NULL;
+ 
+     si->verbose = verbose;
++    si->session_is_locked = FALSE;
+ 
+     r = sd_login_monitor_new("session", &si->mon);
+     if (r < 0) {
+@@ -50,6 +159,7 @@ struct session_info *session_info_create(int verbose)
+         return NULL;
+     }
+ 
++    si->dbus.system_connection = si_dbus_get_system_bus();
+     return si;
+ }
+ 
+@@ -58,6 +168,8 @@ void session_info_destroy(struct session_info *si)
+     if (!si)
+         return;
+ 
++    si_dbus_match_remove(si);
++    dbus_connection_close(si->dbus.system_connection);
+     sd_login_monitor_unref(si->mon);
+     free(si->session);
+     free(si);
+@@ -87,6 +199,7 @@ const char *session_info_get_active_session(struct session_info *si)
+     sd_login_monitor_flush(si->mon);
+     free(old_session);
+ 
++    si_dbus_match_rule_update(si);
+     return si->session;
+ }
+ 
+@@ -104,3 +217,17 @@ char *session_info_session_for_pid(struct session_info *si, uint32_t pid)
+ 
+     return session;
+ }
++
++gboolean session_info_session_is_locked(struct session_info *si)
++{
++    g_return_val_if_fail (si != NULL, FALSE);
++
++    /* We could also rely on IdleHint property from Session which seems to work
++     * well in rhel7 but it wasn't working well in my own system (F23). I'm
++     * convinced for now that Lock/Unlock signals should be enough but that
++     * means Lock/Unlock being done by logind. That might take a while.
++     * Check: https://bugzilla.gnome.org/show_bug.cgi?id=764773 */
++
++    si_dbus_read_signals(si);
++    return si->session_is_locked;
++}
+diff --git a/src/vdagentd.c b/src/vdagentd.c
+index 4f683dc..54f3a87 100644
+--- a/src/vdagentd.c
++++ b/src/vdagentd.c
+@@ -262,6 +262,13 @@ static void do_client_file_xfer(struct vdagent_virtio_port *vport,
+                "active session, cancelling client file-xfer request %u",
+                s->id, VD_AGENT_FILE_XFER_STATUS_CANCELLED);
+             return;
++        } else if (session_info_session_is_locked(session_info)) {
++            syslog(LOG_DEBUG, "Session is locked, skipping file-xfer-start");
++            send_file_xfer_status(vport,
++               "User's session is locked and cannot start file transfer. "
++               "Cancelling client file-xfer request %u",
++               s->id, VD_AGENT_FILE_XFER_STATUS_ERROR);
++            return;
+         }
+         udscs_write(active_session_conn, VDAGENTD_FILE_XFER_START, 0, 0,
+                     data, message_header->size);

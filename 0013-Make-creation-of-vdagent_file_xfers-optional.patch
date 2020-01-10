@@ -1,0 +1,72 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Christophe Fergeau <cfergeau@redhat.com>
+Date: Thu, 27 Feb 2014 18:45:24 +0100
+Subject: [PATCH] Make creation of 'vdagent_file_xfers' optional
+
+This commit only adds if (vdagent_file_xfers != NULL) {} checks before
+calling into the file transfer code. This allows to disable file transfer
+handling by setting this variable to NULL.
+
+(cherry picked from commit 7fc4525dcedb280d22feabcd577ec84e5781960f)
+---
+ src/vdagent.c | 30 ++++++++++++++++++++----------
+ 1 file changed, 20 insertions(+), 10 deletions(-)
+
+diff --git a/src/vdagent.c b/src/vdagent.c
+index 1fae1cf..9a973ff 100644
+--- a/src/vdagent.c
++++ b/src/vdagent.c
+@@ -88,25 +88,33 @@ void daemon_read_complete(struct udscs_connection **connp,
+         }
+         break;
+     case VDAGENTD_FILE_XFER_START:
+-        vdagent_file_xfers_start(vdagent_file_xfers,
+-                                 (VDAgentFileXferStartMessage *)data);
++        if (vdagent_file_xfers != NULL) {
++            vdagent_file_xfers_start(vdagent_file_xfers,
++                                     (VDAgentFileXferStartMessage *)data);
++        }
+         free(data);
+         break;
+     case VDAGENTD_FILE_XFER_STATUS:
+-        vdagent_file_xfers_status(vdagent_file_xfers,
+-                                  (VDAgentFileXferStatusMessage *)data);
++        if (vdagent_file_xfers != NULL) {
++            vdagent_file_xfers_status(vdagent_file_xfers,
++                                      (VDAgentFileXferStatusMessage *)data);
++        }
+         free(data);
+         break;
+     case VDAGENTD_FILE_XFER_DATA:
+-        vdagent_file_xfers_data(vdagent_file_xfers,
+-                                (VDAgentFileXferDataMessage *)data);
++        if (vdagent_file_xfers != NULL) {
++            vdagent_file_xfers_data(vdagent_file_xfers,
++                                    (VDAgentFileXferDataMessage *)data);
++        }
+         free(data);
+         break;
+     case VDAGENTD_CLIENT_DISCONNECTED:
+         vdagent_x11_client_disconnected(x11);
+-        vdagent_file_xfers_destroy(vdagent_file_xfers);
+-        vdagent_file_xfers = vdagent_file_xfers_create(client, fx_dir,
+-                                                       fx_open_dir, debug);
++        if (vdagent_file_xfers != NULL) {
++            vdagent_file_xfers_destroy(vdagent_file_xfers);
++            vdagent_file_xfers = vdagent_file_xfers_create(client, fx_dir,
++                                                           fx_open_dir, debug);
++        }
+         break;
+     default:
+         syslog(LOG_ERR, "Unknown message from vdagentd type: %d, ignoring",
+@@ -293,7 +301,9 @@ reconnect:
+         udscs_client_handle_fds(&client, &readfds, &writefds);
+     }
+ 
+-    vdagent_file_xfers_destroy(vdagent_file_xfers);
++    if (vdagent_file_xfers != NULL) {
++        vdagent_file_xfers_destroy(vdagent_file_xfers);
++    }
+     vdagent_x11_destroy(x11, client == NULL);
+     udscs_destroy_connection(&client);
+     if (!quit && do_daemonize)

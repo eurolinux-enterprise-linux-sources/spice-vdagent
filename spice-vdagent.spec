@@ -1,6 +1,6 @@
 Name:           spice-vdagent
 Version:        0.14.0
-Release:        11%{?dist}
+Release:        13%{?dist}
 Summary:        Agent for Spice guests
 Group:          Applications/System
 License:        GPLv3+
@@ -24,6 +24,25 @@ Patch9:         0009-build-sys-Enable-large-file-support.patch
 # For rhbz#1086657
 Patch10:        0010-include-glib-h.patch
 Patch11:        0011-randr-handle-XRRScreenChangeNotifyEvent.patch
+Patch12:        0012-Add-g_return_if_fail-guards-to-file-xfer-public-func.patch
+Patch13:        0013-Make-creation-of-vdagent_file_xfers-optional.patch
+Patch14:        0014-Disable-file-xfer-when-no-suitable-destination-dir.patch
+Patch15:        0015-Report-an-error-when-file-transfers-are-disabled.patch
+Patch16:        0016-console-kit-use-define-for-dbus-paths.patch
+Patch17:        0017-console-kit-use-standard-name-for-session-info-var.patch
+Patch18:        0018-console-kit-save-verbosity-level-for-debugging.patch
+Patch19:        0019-console-kit-do-not-use-empty-session.patch
+Patch20:        0020-console-kit-include-signal-handler-function.patch
+Patch21:        0021-console-kit-include-handler-for-dbus-match.patch
+Patch22:        0022-vdagentd-send-file-xfer-status-generic-version.patch
+Patch23:        0023-console-kit-Ignore-unrequested-messages-from-dbus.patch
+Patch24:        0024-console-kit-fix-dangling-pointer.patch
+Patch25:        0025-session-info-check-for-a-locked-session.patch
+Patch26:        0026-console-kit-implement-check-for-locked-session.patch
+Patch27:        0027-session-info-check-if-session-belongs-to-user.patch
+Patch28:        0028-console-kit-implement-check-for-session-type.patch
+Patch29:        0029-console-kit-Check-session-lock-just-by-IdleHint.patch
+
 
 BuildRoot:      %{_tmppath}/%{name}-%{version}-%{release}-root-%(%{__id_u} -n)
 BuildRequires:  spice-protocol glib2-devel libpciaccess-devel dbus-devel
@@ -68,6 +87,24 @@ Features:
 %patch9 -p1
 %patch10 -p1
 %patch11 -p1
+%patch12 -p1
+%patch13 -p1
+%patch14 -p1
+%patch15 -p1
+%patch16 -p1
+%patch17 -p1
+%patch18 -p1
+%patch19 -p1
+%patch20 -p1
+%patch21 -p1
+%patch22 -p1
+%patch23 -p1
+%patch24 -p1
+%patch25 -p1
+%patch26 -p1
+%patch27 -p1
+%patch28 -p1
+%patch29 -p1
 autoreconf --install --force
 
 
@@ -139,6 +176,16 @@ fi
 
 
 %changelog
+* Mon Jan 16 2017 Pavel Grunt <pgrunt@redhat.com> 0.14.0-13
+- Check properly for locked session
+  Resolves: rhbz#1412673
+
+* Tue Sep  6 2016 Victor Toso <victortoso@redhat.com> 0.14.0-12
+- Do not allow file-transfer on locked session
+  Resolves: rhbz#1323630
+- Do not allow file-transfer on login screen
+  Resolves: rhbz#1323640
+
 * Fri Jan  8 2016 Eduardo Lima (Etrunko) <etrunko@redhat.com> 0.14.0-11
 - Revert 0010-randr-remove-monitors.xml-on-auto-configuration.patch
   Resolves: rhbz#1130080

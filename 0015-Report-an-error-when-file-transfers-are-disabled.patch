@@ -1,0 +1,78 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Christophe Fergeau <cfergeau@redhat.com>
+Date: Tue, 8 Apr 2014 16:11:38 +0200
+Subject: [PATCH] Report an error when file transfers are disabled
+
+This commit sends back a VD_AGENT_FILE_XFER_STATUS_ERROR to clients which
+try to transfer files when the agent disabled file transfers (for example
+because there is no valid destination directory for the transferred files).
+
+(cherry picked from commit 9ea18740b8cf4466ebd2f6bca42d1d70dd0ba01c)
+---
+ src/vdagent-file-xfers.c | 8 ++++++++
+ src/vdagent-file-xfers.h | 2 ++
+ src/vdagent.c            | 9 +++++++++
+ 3 files changed, 19 insertions(+)
+
+diff --git a/src/vdagent-file-xfers.c b/src/vdagent-file-xfers.c
+index 379cda0..344859d 100644
+--- a/src/vdagent-file-xfers.c
++++ b/src/vdagent-file-xfers.c
+@@ -315,3 +315,11 @@ void vdagent_file_xfers_data(struct vdagent_file_xfers *xfers,
+         g_hash_table_remove(xfers->xfers, GUINT_TO_POINTER(msg->id));
+     }
+ }
++
++void vdagent_file_xfers_error(struct udscs_connection *vdagentd, uint32_t msg_id)
++{
++    g_return_if_fail(vdagentd != NULL);
++
++    udscs_write(vdagentd, VDAGENTD_FILE_XFER_STATUS,
++                msg_id, VD_AGENT_FILE_XFER_STATUS_ERROR, NULL, 0);
++}
+diff --git a/src/vdagent-file-xfers.h b/src/vdagent-file-xfers.h
+index 20783eb..fe5da81 100644
+--- a/src/vdagent-file-xfers.h
++++ b/src/vdagent-file-xfers.h
+@@ -37,5 +37,7 @@ void vdagent_file_xfers_status(struct vdagent_file_xfers *xfers,
+     VDAgentFileXferStatusMessage *msg);
+ void vdagent_file_xfers_data(struct vdagent_file_xfers *xfers,
+     VDAgentFileXferDataMessage *msg);
++void vdagent_file_xfers_error(struct udscs_connection *vdagentd,
++    uint32_t msg_id);
+ 
+ #endif
+diff --git a/src/vdagent.c b/src/vdagent.c
+index 83f818c..35da613 100644
+--- a/src/vdagent.c
++++ b/src/vdagent.c
+@@ -91,6 +91,9 @@ void daemon_read_complete(struct udscs_connection **connp,
+         if (vdagent_file_xfers != NULL) {
+             vdagent_file_xfers_start(vdagent_file_xfers,
+                                      (VDAgentFileXferStartMessage *)data);
++        } else {
++            vdagent_file_xfers_error(*connp,
++                                     ((VDAgentFileXferStartMessage *)data)->id);
+         }
+         free(data);
+         break;
+@@ -98,6 +101,9 @@ void daemon_read_complete(struct udscs_connection **connp,
+         if (vdagent_file_xfers != NULL) {
+             vdagent_file_xfers_status(vdagent_file_xfers,
+                                       (VDAgentFileXferStatusMessage *)data);
++        } else {
++            vdagent_file_xfers_error(*connp,
++                                     ((VDAgentFileXferStatusMessage *)data)->id);
+         }
+         free(data);
+         break;
+@@ -105,6 +111,9 @@ void daemon_read_complete(struct udscs_connection **connp,
+         if (vdagent_file_xfers != NULL) {
+             vdagent_file_xfers_data(vdagent_file_xfers,
+                                     (VDAgentFileXferDataMessage *)data);
++        } else {
++            vdagent_file_xfers_error(*connp,
++                                     ((VDAgentFileXferDataMessage *)data)->id);
+         }
+         free(data);
+         break;

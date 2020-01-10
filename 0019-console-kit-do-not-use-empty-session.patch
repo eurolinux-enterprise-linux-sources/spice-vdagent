@@ -1,0 +1,34 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Victor Toso <victortoso@redhat.com>
+Date: Sat, 23 Apr 2016 10:20:20 +0200
+Subject: [PATCH] console-kit: do not use empty session
+
+DBus might return empty string for active-session, probably in a non
+user session (e.g. gdm). It is better to keep the variable as NULL as
+we check against that (but never against empty strings).
+
+Signed-off-by: Victor Toso <victortoso@redhat.com>
+Acked-by: Jonathon Jongsma <jjongsma@redhat.com>
+(cherry picked from commit 9e3e121e35769d13f6bee7f80ca8f40d7735bf0b)
+---
+ src/console-kit.c | 7 ++++++-
+ 1 file changed, 6 insertions(+), 1 deletion(-)
+
+diff --git a/src/console-kit.c b/src/console-kit.c
+index 0bc6c52..2b58c9a 100644
+--- a/src/console-kit.c
++++ b/src/console-kit.c
+@@ -357,7 +357,12 @@ static char *console_kit_check_active_session_change(struct session_info *info)
+         }
+ 
+         dbus_message_iter_get_basic(&iter, &session);
+-        info->active_session = strdup(session);
++        if (session != NULL && session[0] != '\0') {
++            info->active_session = strdup(session);
++        } else {
++            syslog(LOG_WARNING, "(console-kit) received invalid session. "
++                   "No active-session at the moment");
++        }
+         dbus_message_unref(message);
+ 
+         /* non blocking read of the next available message */
