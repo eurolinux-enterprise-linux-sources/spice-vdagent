@@ -1,0 +1,60 @@
+From a05d9a0d953e621c20a60a28f7eb59919a58614c Mon Sep 17 00:00:00 2001
+From: =?UTF-8?q?Marc-Andr=C3=A9=20Lureau?= <marcandre.lureau@redhat.com>
+Date: Tue, 15 Jul 2014 13:17:09 +0200
+Subject: [vdagent-linux] Reply to TIMESTAMP requests
+
+Add TIMESTAMP handling,
+This is to please vncviewer.
+
+https://bugzilla.redhat.com/show_bug.cgi?id=1117764
+(cherry picked from commit b87fab52eb825429e5393ac4c2c073c918d8ed8f)
+---
+ src/vdagent-x11-priv.h |  1 +
+ src/vdagent-x11.c      | 15 +++++++++++++++
+ 2 files changed, 16 insertions(+)
+
+diff --git a/src/vdagent-x11-priv.h b/src/vdagent-x11-priv.h
+index c607850..4a5729b 100644
+--- a/src/vdagent-x11-priv.h
++++ b/src/vdagent-x11-priv.h
+@@ -83,6 +83,7 @@ struct vdagent_x11 {
+     Atom targets_atom;
+     Atom incr_atom;
+     Atom multiple_atom;
++    Atom timestamp_atom;
+     Window root_window[MAX_SCREENS];
+     Window selection_window;
+     struct udscs_connection *vdagentd;
+diff --git a/src/vdagent-x11.c b/src/vdagent-x11.c
+index 8781d5e..5ac2cf7 100644
+--- a/src/vdagent-x11.c
++++ b/src/vdagent-x11.c
+@@ -218,6 +218,7 @@ struct vdagent_x11 *vdagent_x11_create(struct udscs_connection *vdagentd,
+     x11->targets_atom = XInternAtom(x11->display, "TARGETS", False);
+     x11->incr_atom = XInternAtom(x11->display, "INCR", False);
+     x11->multiple_atom = XInternAtom(x11->display, "MULTIPLE", False);
++    x11->timestamp_atom = XInternAtom(x11->display, "TIMESTAMP", False);
+     for(i = 0; i < clipboard_format_count; i++) {
+         x11->clipboard_formats[i].type = clipboard_format_templates[i].type;
+         for(j = 0; clipboard_format_templates[i].atom_names[j]; j++) {
+@@ -1033,6 +1034,20 @@ static void vdagent_x11_handle_selection_request(struct vdagent_x11 *x11)
+         return;
+     }
+ 
++    if (event->xselectionrequest.target == x11->timestamp_atom) {
++        /* TODO: use more accurate selection time */
++        guint32 timestamp = event->xselectionrequest.time;
++
++        XChangeProperty(x11->display, event->xselectionrequest.requestor,
++                       event->xselectionrequest.property,
++                        event->xselectionrequest.target, 32, PropModeReplace,
++                        (guint8*)&timestamp, 1);
++        vdagent_x11_send_selection_notify(x11,
++                       event->xselectionrequest.property, NULL);
++       return;
++    }
++
++
+     if (event->xselectionrequest.target == x11->targets_atom) {
+         vdagent_x11_send_targets(x11, selection, event);
+         return;

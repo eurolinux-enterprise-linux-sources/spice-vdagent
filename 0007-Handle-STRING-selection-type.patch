@@ -1,0 +1,28 @@
+From 2e201355ca48870a8d50afd982c723b435c0f697 Mon Sep 17 00:00:00 2001
+From: =?UTF-8?q?Marc-Andr=C3=A9=20Lureau?= <marcandre.lureau@redhat.com>
+Date: Tue, 15 Jul 2014 16:48:06 +0200
+Subject: [vdagent-linux] Handle STRING selection type
+
+This is to please vncviewer.
+
+https://bugzilla.redhat.com/show_bug.cgi?id=1117764
+(cherry picked from commit 658c4d76e2aff9441614dcd09821057b9fd8c8c2)
+---
+ src/vdagent-x11-priv.h | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/src/vdagent-x11-priv.h b/src/vdagent-x11-priv.h
+index 4a5729b..38f852e 100644
+--- a/src/vdagent-x11-priv.h
++++ b/src/vdagent-x11-priv.h
+@@ -64,8 +64,8 @@ struct monitor_size {
+ };
+ 
+ static const struct clipboard_format_tmpl clipboard_format_templates[] = {
+-    { VD_AGENT_CLIPBOARD_UTF8_TEXT, { "UTF8_STRING",
+-      "text/plain;charset=UTF-8", "text/plain;charset=utf-8", NULL }, },
++    { VD_AGENT_CLIPBOARD_UTF8_TEXT, { "UTF8_STRING", "text/plain;charset=UTF-8",
++      "text/plain;charset=utf-8", "STRING", NULL }, },
+     { VD_AGENT_CLIPBOARD_IMAGE_PNG, { "image/png", NULL }, },
+     { VD_AGENT_CLIPBOARD_IMAGE_BMP, { "image/bmp", "image/x-bmp",
+       "image/x-MS-bmp", "image/x-win-bitmap", NULL }, },

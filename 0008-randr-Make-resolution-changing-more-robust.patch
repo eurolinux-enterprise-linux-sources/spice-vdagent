@@ -1,0 +1,140 @@
+From 5225df09963d1cad0708853db3c7ceed94a0f0e9 Mon Sep 17 00:00:00 2001
+From: =?UTF-8?q?Fabiano=20Fid=C3=AAncio?= <ffidenci@rhelsix.(none)>
+Date: Tue, 7 Apr 2015 15:01:44 +0200
+Subject: [PATCH] randr: Make resolution changing more robust
+
+When running a guest using a KMS QXL driver on a RHEL6 hypervisor,
+spice_vdagent would crash on resolution changes with:
+X Error of failed request:  BadValue (integer parameter out of range for operation)
+  Major opcode of failed request:  139 (RANDR)
+  Minor opcode of failed request:  21 (RRSetCrtcConfig)
+  Value in failed request:  0x0
+  Serial number of failed request:  75
+  Current serial number in output stream:  75
+
+(if using a newer QEMU, this will not crash as the resolution codepath is
+totally different, see red_dispatcher_use_client_monitors_config() in
+spice-server, when using the UMS QXL driver, the crash will not happen
+because of
+http://cgit.freedesktop.org/xorg/driver/xf86-video-qxl/commit/?id=907d0ff0
+).
+
+This crash happens in vdagent_x11_set_monitor_config() because the X server
+rejects the request because we are trying to set a CRTC to a size which is
+bigger than the current screen (using 'screen' and 'CRTC' as in the RandR
+spec at http://www.x.org/releases/X11R7.5/doc/randrproto/randrproto.txt ).
+
+If we resize the screen before changing the CRTCs resolution, then this
+error will no longer happen. However, if we first call XRRSetScreenSize()
+and then XRRSetCrtcConfig(), the call to XRRSetScreeSize() will fail when
+we try to make the screen smaller as there will be active CRTCs which would
+be bigger than the screen.
+
+In order to solve these issues, we follow the same process as what mutter
+does in meta_monitor_manager_xrandr_apply_configuration()
+https://git.gnome.org/browse/mutter/tree/src/core/monitor-xrandr.c#n689:
+
+1. we disable the CRTCs which are off and the ones which are bigger than the
+   size we want to set the screen to.
+2. we resize the screen with a call to XRRSetScreenSize().
+3. we set each CRTCs to their new resolution.
+---
+ src/vdagent-x11-randr.c |   61 ++++++++++++++++++++++++++++++++++++----------
+ 1 files changed, 47 insertions(+), 14 deletions(-)
+
+diff --git a/src/vdagent-x11-randr.c b/src/vdagent-x11-randr.c
+index 58b5be7..0cfe77c 100644
+--- a/src/vdagent-x11-randr.c
++++ b/src/vdagent-x11-randr.c
+@@ -690,8 +690,6 @@ void vdagent_x11_set_monitor_config(struct vdagent_x11 *x11,
+                                     VDAgentMonitorsConfig *mon_config,
+                                     int fallback)
+ {
+-    int width, height;
+-    int x, y;
+     int primary_w, primary_h;
+     int i, real_num_of_monitors = 0;
+     VDAgentMonitorsConfig *curr = NULL;
+@@ -750,24 +748,38 @@ void vdagent_x11_set_monitor_config(struct vdagent_x11 *x11,
+     for (i = mon_config->num_of_monitors; i < x11->randr.res->noutput; i++)
+         xrandr_disable_output(x11, i);
+ 
++    /* First, disable disabled CRTCs ... */
+     for (i = 0; i < mon_config->num_of_monitors; ++i) {
+         if (!monitor_enabled(&mon_config->monitors[i])) {
+             xrandr_disable_output(x11, i);
+-            continue;
+         }
+-        /* Try to create the requested resolution */
+-        width = mon_config->monitors[i].width;
+-        height = mon_config->monitors[i].height;
+-        x = mon_config->monitors[i].x;
+-        y = mon_config->monitors[i].y;
+-        if (!xrandr_add_and_set(x11, i, x, y, width, height) &&
+-                enabled_monitors(mon_config) == 1) {
+-            set_screen_to_best_size(x11, width, height,
+-                                    &primary_w, &primary_h);
+-            goto update;
++    }
++
++    /* ... and disable the ones that would be bigger than
++     * the new RandR screen once it is resized. If they are enabled the
++     * XRRSetScreenSize call will fail with BadMatch. They will be
++     * reenabled after hanging the screen size.
++     */
++    for (i = 0; i < curr->num_of_monitors; ++i) {
++        int width, height;
++        int x, y;
++
++        width = curr->monitors[i].width;
++        height = curr->monitors[i].height;
++        x = curr->monitors[i].x;
++        y = curr->monitors[i].y;
++
++        if ((x + width > primary_w) || (y + height > primary_h)) {
++            if (x11->debug)
++                syslog(LOG_DEBUG, "Disabling monitor %d: "
++                       "%dx%d+%d+%d > (%d,%d)",
++                       i, width, height, x, y, primary_w, primary_h);
++
++            xrandr_disable_output(x11, i);
+         }
+     }
+ 
++    /* Then we can resize the RandR screen. */
+     if (primary_w != x11->width[0] || primary_h != x11->height[0]) {
+         const int dpi = 96; /* FIXME: read settings from desktop or get from client dpi? */
+         int width_mm = (MM_PER_INCH * primary_w) / dpi;
+@@ -798,7 +810,28 @@ void vdagent_x11_set_monitor_config(struct vdagent_x11 *x11,
+         }
+     }
+ 
+-update:
++    /* Finally, we set the new resolutions on RandR CRTCs now that the
++     * RandR screen is big enough to hold these.  */
++    for (i = 0; i < mon_config->num_of_monitors; ++i) {
++        int width, height;
++        int x, y;
++
++        if (!monitor_enabled(&mon_config->monitors[i])) {
++            continue;
++        }
++        /* Try to create the requested resolution */
++        width = mon_config->monitors[i].width;
++        height = mon_config->monitors[i].height;
++        x = mon_config->monitors[i].x;
++        y = mon_config->monitors[i].y;
++        if (!xrandr_add_and_set(x11, i, x, y, width, height) &&
++                enabled_monitors(mon_config) == 1) {
++            set_screen_to_best_size(x11, width, height,
++                                    &primary_w, &primary_h);
++            break;
++        }
++    }
++
+     update_randr_res(x11,
+         x11->randr.num_monitors != enabled_monitors(mon_config));
+     x11->width[0] = primary_w;
+-- 
+1.7.1
+

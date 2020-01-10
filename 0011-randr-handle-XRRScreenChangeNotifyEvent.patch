@@ -1,0 +1,122 @@
+From a8bbff07b1d4e5d47c29d7d736f185e820119694 Mon Sep 17 00:00:00 2001
+From: Marc-Andre Lureau <marcandre.lureau@redhat.com>
+Date: Wed, 27 Aug 2014 20:51:10 +0200
+Subject: [PATCH 2/2] randr: handle XRRScreenChangeNotifyEvent
+
+Make sure vdagent follows the current monitor configuration.  This
+solves a number of issue where the pointer input is off, because the
+uinput tablet isn't reconfigured.
+
+https://bugzilla.redhat.com/show_bug.cgi?id=1086657
+---
+ src/vdagent-x11-priv.h  |  4 +++-
+ src/vdagent-x11-randr.c | 34 +++++++++++++++++++++++++++++++++-
+ src/vdagent-x11.c       |  4 +++-
+ 3 files changed, 39 insertions(+), 3 deletions(-)
+
+diff --git a/src/vdagent-x11-priv.h b/src/vdagent-x11-priv.h
+index 38f852e..d60cc07 100644
+--- a/src/vdagent-x11-priv.h
++++ b/src/vdagent-x11-priv.h
+@@ -95,6 +95,7 @@ struct vdagent_x11 {
+     int height[MAX_SCREENS];
+     int has_xfixes;
+     int xfixes_event_base;
++    int xrandr_event_base;
+     int max_prop_size;
+     int expected_targets_notifies[256];
+     int clipboard_owner[256];
+@@ -145,7 +146,8 @@ void vdagent_x11_send_daemon_guest_xorg_res(struct vdagent_x11 *x11,
+                                             int update);
+ void vdagent_x11_randr_handle_root_size_change(struct vdagent_x11 *x11,
+                                             int screen, int width, int height);
+-
++int vdagent_x11_randr_handle_event(struct vdagent_x11 *x11,
++    XEvent event);
+ void vdagent_x11_set_error_handler(struct vdagent_x11 *x11,
+     int (*handler)(Display *, XErrorEvent *));
+ int vdagent_x11_restore_error_handler(struct vdagent_x11 *x11);
+diff --git a/src/vdagent-x11-randr.c b/src/vdagent-x11-randr.c
+index 2491824..a1e25ad 100644
+--- a/src/vdagent-x11-randr.c
++++ b/src/vdagent-x11-randr.c
+@@ -132,12 +132,15 @@ void vdagent_x11_randr_init(struct vdagent_x11 *x11)
+         return;
+     }
+ 
+-    if (XRRQueryExtension(x11->display, &i, &i)) {
++    if (XRRQueryExtension(x11->display, &x11->xrandr_event_base, &i)) {
+         XRRQueryVersion(x11->display, &x11->xrandr_major, &x11->xrandr_minor);
+         if (x11->xrandr_major == 1 && x11->xrandr_minor >= 3)
+             x11->has_xrandr = 1;
+     }
+ 
++    XRRSelectInput(x11->display, x11->root_window[0],
++        RRScreenChangeNotifyMask | RRCrtcChangeNotifyMask);
++
+     if (x11->has_xrandr) {
+         update_randr_res(x11, 0);
+     } else {
+@@ -466,6 +469,8 @@ static int set_screen_to_best_size(struct vdagent_x11 *x11, int width, int heigh
+ void vdagent_x11_randr_handle_root_size_change(struct vdagent_x11 *x11,
+     int screen, int width, int height)
+ {
++    update_randr_res(x11, 0);
++
+     if (width == x11->width[screen] && height == x11->height[screen]) {
+         return;
+     }
+@@ -481,6 +486,33 @@ void vdagent_x11_randr_handle_root_size_change(struct vdagent_x11 *x11,
+     }
+ }
+ 
++int vdagent_x11_randr_handle_event(struct vdagent_x11 *x11,
++    XEvent event)
++{
++    int handled = TRUE;
++
++    switch (event.type - x11->xrandr_event_base) {
++        case RRScreenChangeNotify: {
++            XRRScreenChangeNotifyEvent *sce =
++                (XRRScreenChangeNotifyEvent *) &event;
++            vdagent_x11_randr_handle_root_size_change(x11, 0,
++                sce->width, sce->height);
++            break;
++        }
++        case RRNotify: {
++            update_randr_res(x11, 0);
++            if (!x11->dont_send_guest_xorg_res)
++                vdagent_x11_send_daemon_guest_xorg_res(x11, 1);
++            break;
++        }
++        default:
++            handled = FALSE;
++            break;
++    }
++
++    return handled;
++}
++
+ static int min_int(int x, int y)
+ {
+     return x > y ? y : x;
+diff --git a/src/vdagent-x11.c b/src/vdagent-x11.c
+index 752b337..9619dc5 100644
+--- a/src/vdagent-x11.c
++++ b/src/vdagent-x11.c
+@@ -503,9 +503,11 @@ static void vdagent_x11_handle_event(struct vdagent_x11 *x11, XEvent event)
+         return;
+     }
+ 
++    if (vdagent_x11_randr_handle_event(x11, event))
++        return;
++
+     switch (event.type) {
+     case ConfigureNotify:
+-        // TODO: handle CrtcConfigureNotify, OutputConfigureNotify can be ignored.
+         for (i = 0; i < x11->screen_count; i++)
+             if (event.xconfigure.window == x11->root_window[i])
+                 break;
+-- 
+2.3.5
+
