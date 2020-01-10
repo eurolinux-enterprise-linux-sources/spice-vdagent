@@ -1,0 +1,54 @@
+From d6f33bcce509acb641357a20dafc1330d76ada3c Mon Sep 17 00:00:00 2001
+From: =?UTF-8?q?Marc-Andr=C3=A9=20Lureau?= <marcandre.lureau@redhat.com>
+Date: Fri, 21 Feb 2014 16:13:09 +0100
+Subject: [PATCH 4/4] randr: set physical screen size to keep a constant 96 dpi
+
+Some applications compute DPI based on physcial screen size.  Currently,
+the width is reported to be 270mm, regardless of the resolution.  This
+patch instead compute a physical screen size to have a constant DPI of
+96. Of course, there are possible improvements to this approach (see
+fixme), however, since that code is no longer executed with DRM driver,
+I don't think we should invest more effort here (I guess DRM driver
+relies on xrandr / gnome-settings-daemon to do the right thing, so
+physical screen is updated)
+
+https://bugzilla.redhat.com/show_bug.cgi?id=1066094
+---
+ src/vdagent-x11-randr.c |    9 +++++++--
+ 1 files changed, 7 insertions(+), 2 deletions(-)
+
+diff --git a/src/vdagent-x11-randr.c b/src/vdagent-x11-randr.c
+index 5223f88..58b5be7 100644
+--- a/src/vdagent-x11-randr.c
++++ b/src/vdagent-x11-randr.c
+@@ -32,6 +32,8 @@
+ #include "vdagent-x11.h"
+ #include "vdagent-x11-priv.h"
+ 
++#define MM_PER_INCH (25.4)
++
+ static int error_handler(Display *display, XErrorEvent *error)
+ {
+     vdagent_x11_caught_error = 1;
+@@ -767,13 +769,16 @@ void vdagent_x11_set_monitor_config(struct vdagent_x11 *x11,
+     }
+ 
+     if (primary_w != x11->width[0] || primary_h != x11->height[0]) {
++        const int dpi = 96; /* FIXME: read settings from desktop or get from client dpi? */
++        int width_mm = (MM_PER_INCH * primary_w) / dpi;
++        int height_mm = (MM_PER_INCH * primary_h) / dpi;
++
+         if (x11->debug)
+             syslog(LOG_DEBUG, "Changing screen size to %dx%d",
+                    primary_w, primary_h);
+         vdagent_x11_set_error_handler(x11, error_handler);
+         XRRSetScreenSize(x11->display, x11->root_window[0], primary_w, primary_h,
+-                         DisplayWidthMM(x11->display, 0),
+-                         DisplayHeightMM(x11->display, 0));
++                         width_mm, height_mm);
+         if (vdagent_x11_restore_error_handler(x11)) {
+             syslog(LOG_ERR, "XRRSetScreenSize failed, not enough mem?");
+             if (!fallback && curr) {
+-- 
+1.7.1
+

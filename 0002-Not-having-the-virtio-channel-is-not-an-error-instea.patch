@@ -1,0 +1,42 @@
+From e8237fd257efed156c7c22f91267b43f2efaa9f5 Mon Sep 17 00:00:00 2001
+From: Colin Walters <walters@verbum.org>
+Date: Tue, 11 Jun 2013 15:21:13 -0400
+Subject: [PATCH 2/4] Not having the virtio channel is not an error; instead silently do nothing
+
+Fedora for example bundles the SPICE agent by default; however, we
+don't want to spew an error when running non-virtualized, or with
+plain VNC.
+
+Let's just silently exit; while we could change LOG_ERR -> LOG_INFO
+or something, that's still pointless noise in most people's syslog.
+
+Someone who was debugging a misconfigured SPICE setup would pretty
+quickly notice that they were missing the virtio port.
+
+(This patch is part of a larger initiative to reduce error
+ spew on default startup in common deployment scenarios such as
+ KVM+VNC.)
+
+Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+---
+ src/vdagent.c |    4 +---
+ 1 files changed, 1 insertions(+), 3 deletions(-)
+
+diff --git a/src/vdagent.c b/src/vdagent.c
+index 7e1b474..e2ac9ba 100644
+--- a/src/vdagent.c
++++ b/src/vdagent.c
+@@ -226,9 +226,7 @@ int main(int argc, char *argv[])
+             LOG_USER);
+ 
+     if (file_test(portdev) != 0) {
+-        syslog(LOG_ERR, "Missing virtio device '%s': %s",
+-                portdev, strerror(errno));
+-        return 1;
++        return 0;
+     }
+ 
+     if (do_daemonize)
+-- 
+1.7.1
+
