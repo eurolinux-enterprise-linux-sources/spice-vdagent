@@ -1,6 +1,6 @@
 Name:           spice-vdagent
 Version:        0.14.0
-Release:        9%{?dist}
+Release:        11%{?dist}
 Summary:        Agent for Spice guests
 Group:          Applications/System
 License:        GPLv3+
@@ -22,7 +22,7 @@ Patch8:         0008-randr-Make-resolution-changing-more-robust.patch
 # For rhbz#1206663
 Patch9:         0009-build-sys-Enable-large-file-support.patch
 # For rhbz#1086657
-Patch10:        0010-randr-remove-monitors.xml-on-auto-configuration.patch
+Patch10:        0010-include-glib-h.patch
 Patch11:        0011-randr-handle-XRRScreenChangeNotifyEvent.patch
 
 BuildRoot:      %{_tmppath}/%{name}-%{version}-%{release}-root-%(%{__id_u} -n)
@@ -69,7 +69,6 @@ Features:
 %patch10 -p1
 %patch11 -p1
 autoreconf --install --force
-cp -a data/rsyslog.d/spice-vdagentd.conf rsyslog.conf
 
 
 %build
@@ -81,20 +80,36 @@ make V=2 %{?_smp_mflags}
 %install
 rm -rf $RPM_BUILD_ROOT
 make V=2 install DESTDIR=$RPM_BUILD_ROOT
-# RHEL-6 has no /etc/rsyslog.d
-rm $RPM_BUILD_ROOT%{_sysconfdir}/rsyslog.d/spice-vdagentd.conf
 
 
 %clean
 rm -rf $RPM_BUILD_ROOT
 
 
+%pre
+if [ "$1" -ne "1" ]; then
+  if [ -f %{_docdir}/%{name}-%{version}/rsyslog.conf ]; then
+    # We used to append spice-vdagent rsyslog configuration to the end
+    # of /etc/rsyslog.conf as prior to RHEL 6.3, rsyslog did not support
+    # /etc/rsyslog.d. Until RHEL 6.8, we kept appending the configuration
+    # to /etc/rsyslog.conf. Now that we make use of /etc/rsyslog.d/, we need
+    # to remove the old configuration data from /etc/rsyslog.conf on upgrades,
+    # otherwise we'll end up logging twice spice-vdagent logs
+    start_line=$(grep -x -n "$(head -1 %{_docdir}/%{name}-%{version}/rsyslog.conf)" /etc/rsyslog.conf |sed "s/:.*//")
+    if [ -n "$start_line" ]; then
+      line_count=$(wc -l <%{_docdir}/%{name}-%{version}/rsyslog.conf)
+      end_line=$(expr $start_line + $line_count - 1)
+
+      sed --quiet "$start_line,$end_line"p /etc/rsyslog.conf | cmp --quiet %{_docdir}/%{name}-%{version}/rsyslog.conf
+      if [ "$?" -eq "0" ] ; then
+        sed -i "$start_line,$end_line"d /etc/rsyslog.conf
+      fi
+    fi
+  fi
+fi
+
 %post
 /sbin/chkconfig --add spice-vdagentd
-if ! grep -q spice-vdagent /etc/rsyslog.conf; then
-  echo >> /etc/rsyslog.conf
-  cat %{_datadir}/doc/%{name}-%{version}/rsyslog.conf >> /etc/rsyslog.conf
-fi
 
 %preun
 if [ $1 = 0 ] ; then
@@ -110,11 +125,12 @@ fi
 
 %files
 %defattr(-,root,root,-)
-%doc COPYING ChangeLog README TODO rsyslog.conf
+%doc COPYING ChangeLog README TODO
 %{_initddir}/spice-vdagentd
 %{_bindir}/spice-vdagent
 %{_sbindir}/spice-vdagentd
 %{_var}/run/spice-vdagentd
+%{_sysconfdir}/rsyslog.d/spice-vdagentd.conf
 %{_sysconfdir}/xdg/autostart/spice-vdagent.desktop
 # For /usr/share/gdm/autostart/LoginWindow/spice-vdagent.desktop
 # We own the dir too, otherwise we must Require gdm
@@ -123,6 +139,14 @@ fi
 
 
 %changelog
+* Fri Jan  8 2016 Eduardo Lima (Etrunko) <etrunko@redhat.com> 0.14.0-11
+- Revert 0010-randr-remove-monitors.xml-on-auto-configuration.patch
+  Resolves: rhbz#1130080
+
+* Tue Jan 05 2016 Christophe Fergeau <cfergeau@redhat.com> 0.14.0-10
+- Use /etc/rsyslog.d rather than modifying /etc/rsyslog.conf
+  Resolves: rhbz#1288466
+
 * Fri Apr 10 2015 Fabiano Fidêncio <fidencio@redhat.com> 0.14.0-9
 - Add -fno-strict-aliasing to CFLAGS
   Related: rhbz#1086657

@@ -1,0 +1,12 @@
+diff --git a/src/vdagent-x11-randr.c b/src/vdagent-x11-randr.c
+index c332a40..2491824 100644
+--- a/src/vdagent-x11-randr.c
++++ b/src/vdagent-x11-randr.c
+@@ -21,6 +21,7 @@
+     along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ */
+ 
++#include <glib.h>
+ #include <string.h>
+ #include <syslog.h>
+ #include <stdlib.h>
