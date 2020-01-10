@@ -1,6 +1,6 @@
 Name:           spice-vdagent
 Version:        0.14.0
-Release:        13%{?dist}
+Release:        13%{?dist}.1
 Summary:        Agent for Spice guests
 Group:          Applications/System
 License:        GPLv3+
@@ -42,6 +42,7 @@ Patch26:        0026-console-kit-implement-check-for-locked-session.patch
 Patch27:        0027-session-info-check-if-session-belongs-to-user.patch
 Patch28:        0028-console-kit-implement-check-for-session-type.patch
 Patch29:        0029-console-kit-Check-session-lock-just-by-IdleHint.patch
+Patch30:        0030-udscs-Avoid-file-descriptor-leak.patch
 
 
 BuildRoot:      %{_tmppath}/%{name}-%{version}-%{release}-root-%(%{__id_u} -n)
@@ -105,6 +106,7 @@ Features:
 %patch27 -p1
 %patch28 -p1
 %patch29 -p1
+%patch30 -p1
 autoreconf --install --force
 
 
@@ -176,6 +178,10 @@ fi
 
 
 %changelog
+* Tue Mar 19 2019 Victor Toso <victortoso@redhat.com> 0.14.0-13.1
+- Fix leak of unix sockets
+  Resolves: rhbz#1687628
+
 * Mon Jan 16 2017 Pavel Grunt <pgrunt@redhat.com> 0.14.0-13
 - Check properly for locked session
   Resolves: rhbz#1412673
