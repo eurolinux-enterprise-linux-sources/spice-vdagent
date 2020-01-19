@@ -1,0 +1,33 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Pavel Grunt <pgrunt@redhat.com>
+Date: Tue, 28 Apr 2015 11:09:28 +0200
+Subject: [PATCH] vdagentd-proto-strings: Add missing string for
+ VDAGENTD_AUDIO_VOLUME_SYNC
+
+Avoids a crash when running spice-vdagent with debug
+
+Backtrace:
+
+ #0  0x0000003dcf647e2c in _IO_vfprintf_internal (s=<value optimized out>, format=<value optimized out>, ap=<value optimized out>) at vfprintf.c:1641
+ #1  0x0000003dcf6e4e90 in __vsyslog_chk (pri=<value optimized out>, flag=-1, fmt=0x40f360 "%p received %s, arg1: %u, arg2: %u, size %u", ap=0x7fffffffddc0) at ../misc/syslog.c:222
+ #2  0x0000003dcf6e50c0 in __syslog (pri=<value optimized out>, fmt=<value optimized out>) at ../misc/syslog.c:119
+ #3  0x000000000040c6da in udscs_read_complete (connp=0x610de8) at src/udscs.c:448
+ #4  0x000000000040c8d1 in udscs_do_read (connp=0x610de8) at src/udscs.c:500
+ #5  0x000000000040c303 in udscs_client_handle_fds (connp=0x610de8, readfds=0x7fffffffe0a0, writefds=0x7fffffffe020) at src/udscs.c:349
+ #6  0x0000000000403d74 in main (argc=3, argv=0x7fffffffe248) at src/vdagent.c:365
+---
+ src/vdagentd-proto-strings.h | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/src/vdagentd-proto-strings.h b/src/vdagentd-proto-strings.h
+index e76cb3b..a3fbd32 100644
+--- a/src/vdagentd-proto-strings.h
++++ b/src/vdagentd-proto-strings.h
+@@ -30,6 +30,7 @@ static const char * const vdagentd_messages[] = {
+         "clipboard data",
+         "clipboard release",
+         "version",
++        "audio volume sync",
+         "file xfer start",
+         "file xfer status",
+         "file xfer data",

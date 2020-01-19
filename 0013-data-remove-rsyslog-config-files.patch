@@ -1,0 +1,56 @@
+From 35fbb9fa6341ed81b5eb6a8049d1982b2ecf4aac Mon Sep 17 00:00:00 2001
+From: =?UTF-8?q?Marc-Andr=C3=A9=20Lureau?= <marcandre.lureau@redhat.com>
+Date: Fri, 5 Sep 2014 15:16:34 +0200
+Subject: [PATCH] data: remove rsyslog config files
+
+Many systems don't use rsyslog, others don't need seperate syslog files
+for vdagent.
+
+With systemd journal, It's possible to filter
+spice-vdagent/spice-vdagentd log messages out of /var/log/messages:
+journalctl SYSLOG_IDENTIFIER=spice-vdagent SLOG_IDENTIFIER=spice-vdagentd
+
+This simplify spice-vdagent packaging and updates, since there are no
+config files to deal with.
+
+Related:
+https://bugzilla.redhat.com/show_bug.cgi?id=1136881
+(cherry picked from commit 072fb03fa47b18dd6cdd3b5c764d59e06fc5815e)
+---
+ Makefile.am                        | 4 ----
+ data/rsyslog.d/spice-vdagentd.conf | 4 ----
+ 2 files changed, 8 deletions(-)
+ delete mode 100644 data/rsyslog.d/spice-vdagentd.conf
+
+diff --git a/Makefile.am b/Makefile.am
+index 8a65704..a06a259 100644
+--- a/Makefile.am
++++ b/Makefile.am
+@@ -51,9 +51,6 @@ gdmautostart2_DATA = $(top_srcdir)/data/spice-vdagent.desktop
+ install-data-local:
+ 	$(mkdir_p) $(DESTDIR)$(localstatedir)/run/spice-vdagentd
+ 
+-rsyslogdir = $(sysconfdir)/rsyslog.d
+-rsyslog_DATA = $(top_srcdir)/data/rsyslog.d/spice-vdagentd.conf
+-
+ if INIT_SCRIPT_RED_HAT
+ initdir = $(sysconfdir)/rc.d/init.d
+ init_SCRIPTS = $(top_srcdir)/data/spice-vdagentd
+@@ -83,7 +80,6 @@ EXTRA_DIST =					\
+ 	README.RHEL-5				\
+ 	data/70-spice-vdagentd.rules		\
+ 	data/modules-load.d/spice-vdagentd.conf	\
+-	data/rsyslog.d/spice-vdagentd.conf	\
+ 	data/spice-vdagent.desktop		\
+ 	data/spice-vdagentd			\
+ 	data/spice-vdagentd.service		\
+diff --git a/data/rsyslog.d/spice-vdagentd.conf b/data/rsyslog.d/spice-vdagentd.conf
+deleted file mode 100644
+index 2437ba0..0000000
+--- a/data/rsyslog.d/spice-vdagentd.conf
++++ /dev/null
+@@ -1,4 +0,0 @@
+-# A template to for higher precision timestamps + severity logging
+-$template SpiceTmpl,"%TIMESTAMP%.%TIMESTAMP:::date-subseconds% %syslogtag% %syslogseverity-text%:%msg:::sp-if-no-1st-sp%%msg:::drop-last-lf%\n"
+-
+-:programname, startswith, "spice-vdagent"	/var/log/spice-vdagent.log;SpiceTmpl

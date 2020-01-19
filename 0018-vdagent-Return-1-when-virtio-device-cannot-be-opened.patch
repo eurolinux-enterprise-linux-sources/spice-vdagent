@@ -1,0 +1,29 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Christophe Fergeau <cfergeau@redhat.com>
+Date: Mon, 7 Sep 2015 16:38:10 +0200
+Subject: [PATCH] vdagent: Return '1' when virtio device cannot be opened
+
+The vdagent process currently exits with an error code set to 0 whenn
+the virtio device cannot be opened (for example because it's missing).
+This is not consistent with the other failures to startup which set the
+exit code to 1. This commit ensures 1 is returned in this situation too.
+
+Resolves: rhbz#1256704
+---
+ src/vdagent.c | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
+
+diff --git a/src/vdagent.c b/src/vdagent.c
+index a26af73..1336faa 100644
+--- a/src/vdagent.c
++++ b/src/vdagent.c
+@@ -238,7 +238,8 @@ int main(int argc, char *argv[])
+             LOG_USER);
+ 
+     if (file_test(portdev) != 0) {
+-        return 0;
++        syslog(LOG_ERR, "Cannot access vdagent virtio channel %s", portdev);
++        return 1;
+     }
+ 
+     if (do_daemonize)

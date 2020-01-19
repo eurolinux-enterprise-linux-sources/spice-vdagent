@@ -1,0 +1,57 @@
+From e22b6b97a067d7c10bfba64fbef60afa777f6275 Mon Sep 17 00:00:00 2001
+From: Hans de Goede <hdegoede@redhat.com>
+Date: Thu, 6 Jun 2013 17:00:22 +0200
+Subject: [PATCH] vdagent[d]: Add printing of version to -h output
+
+Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+(cherry picked from commit 256e01c8c7b0c386525a0fac71537bb7bb05d271)
+---
+ src/vdagent.c  | 6 +++---
+ src/vdagentd.c | 4 ++--
+ 2 files changed, 5 insertions(+), 5 deletions(-)
+
+diff --git a/src/vdagent.c b/src/vdagent.c
+index 7e1b474..9e238d3 100644
+--- a/src/vdagent.c
++++ b/src/vdagent.c
+@@ -132,15 +132,15 @@ static void usage(FILE *fp)
+ {
+     fprintf(fp,
+       "Usage: spice-vdagent [OPTIONS]\n\n"
+-      "Spice guest agent X11 session agent.\n\n"
++      "Spice guest agent X11 session agent, version %s.\n\n"
+       "Options:\n"
+       "  -h                                print this text\n"
+       "  -d                                log debug messages\n"
+       "  -s <port>                         set virtio serial port\n"
+       "  -x                                don't daemonize\n"
+       "  -f <dir|xdg-desktop|xdg-download> file xfer save dir\n"
+-      "  -o <0|1>                          open dir on file xfer completion\n"
+-      );
++      "  -o <0|1>                          open dir on file xfer completion\n",
++      VERSION);
+ }
+ 
+ static void quit_handler(int sig)
+diff --git a/src/vdagentd.c b/src/vdagentd.c
+index fbbe315..1ba957a 100644
+--- a/src/vdagentd.c
++++ b/src/vdagentd.c
+@@ -718,7 +718,7 @@ static void usage(FILE *fp)
+ {
+     fprintf(fp,
+             "Usage: spice-vdagentd [OPTIONS]\n\n"
+-            "Spice guest agent daemon.\n\n"
++            "Spice guest agent daemon, version %s.\n\n"
+             "Options:\n"
+             "  -h         print this text\n"
+             "  -d         log debug messages (use twice for extra info)\n"
+@@ -731,7 +731,7 @@ static void usage(FILE *fp)
+ #ifdef HAVE_LIBSYSTEMD_LOGIN
+             "  -X         Disable systemd-logind integration\n"
+ #endif
+-            ,portdev, uinput_device);
++            ,VERSION, portdev, uinput_device);
+ }
+ 
+ void daemonize(void)

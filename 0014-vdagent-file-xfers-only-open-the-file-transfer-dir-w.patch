@@ -1,0 +1,30 @@
+From 6705c11d7ec4808e2dc70e7a4875323e2dfd0f62 Mon Sep 17 00:00:00 2001
+From: =?UTF-8?q?Fabiano=20Fid=C3=AAncio?= <fidencio@redhat.com>
+Date: Thu, 28 Aug 2014 16:24:04 +0200
+Subject: [PATCH] vdagent-file-xfers: only open the file transfer dir when all
+ the files were transferred
+
+Once transferring multiple files is supported, do not bother the user
+opening the file transfer directory for each file transferred, just do it
+when the last file transfer is finished.
+---
+ src/vdagent-file-xfers.c | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
+
+diff --git a/src/vdagent-file-xfers.c b/src/vdagent-file-xfers.c
+index b792282..4dea6de 100644
+--- a/src/vdagent-file-xfers.c
++++ b/src/vdagent-file-xfers.c
+@@ -282,7 +282,8 @@ void vdagent_file_xfers_data(struct vdagent_file_xfers *xfers,
+                 close(task->file_fd);
+                 task->file_fd = -1;
+                 if (xfers->open_save_dir &&
+-                        task->file_xfer_nr == task->file_xfer_total) {
++                        task->file_xfer_nr == task->file_xfer_total &&
++                        g_hash_table_size(xfers->xfers) == 1) {
+                     char buf[PATH_MAX];
+                     snprintf(buf, PATH_MAX, "xdg-open '%s'&", xfers->save_dir);
+                     status = system(buf);
+-- 
+2.1.0
+

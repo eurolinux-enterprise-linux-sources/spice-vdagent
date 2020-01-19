@@ -1,0 +1,22 @@
+From b251f710663cbbf4170d98f64d1f0bd4eb70f848 Mon Sep 17 00:00:00 2001
+From: Hans de Goede <hdegoede@redhat.com>
+Date: Mon, 24 Jun 2013 10:34:27 +0200
+Subject: [PATCH] vdagentd: Advertise VD_AGENT_CAP_GUEST_LINEEND_LF
+
+Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+---
+ src/vdagentd.c | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/src/vdagentd.c b/src/vdagentd.c
+index 1ba957a..6280dfa 100644
+--- a/src/vdagentd.c
++++ b/src/vdagentd.c
+@@ -95,6 +95,7 @@ static void send_capabilities(struct vdagent_virtio_port *vport,
+     VD_AGENT_SET_CAPABILITY(caps->caps, VD_AGENT_CAP_CLIPBOARD_BY_DEMAND);
+     VD_AGENT_SET_CAPABILITY(caps->caps, VD_AGENT_CAP_CLIPBOARD_SELECTION);
+     VD_AGENT_SET_CAPABILITY(caps->caps, VD_AGENT_CAP_SPARSE_MONITORS_CONFIG);
++    VD_AGENT_SET_CAPABILITY(caps->caps, VD_AGENT_CAP_GUEST_LINEEND_LF);
+ 
+     vdagent_virtio_port_write(vport, VDP_CLIENT_PORT,
+                               VD_AGENT_ANNOUNCE_CAPABILITIES, 0,

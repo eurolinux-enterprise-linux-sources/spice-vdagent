@@ -1,0 +1,40 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Christophe Fergeau <cfergeau@redhat.com>
+Date: Thu, 27 Mar 2014 18:04:59 +0100
+Subject: [PATCH] Disable file xfer when no suitable destination dir
+
+Currently, if no suitable destination directory can be found, the file
+transfer code defaults to using '.' as the destination directory. As this
+is unlikely to work, better to just disable file transfers when we end up
+in such a situation. This currently happens when spawning spice-vdagent
+from gdm where we don't want file transfers to be available anyway.
+
+(cherry picked from commit 689dcd35edb55abcdef4d30d92fdcca22d81ee23)
+---
+ src/vdagent.c | 11 ++++++-----
+ 1 file changed, 6 insertions(+), 5 deletions(-)
+
+diff --git a/src/vdagent.c b/src/vdagent.c
+index 9586432..32c84e5 100644
+--- a/src/vdagent.c
++++ b/src/vdagent.c
+@@ -282,13 +282,14 @@ reconnect:
+         fx_dir = g_get_user_special_dir(G_USER_DIRECTORY_DESKTOP);
+     else if (!strcmp(fx_dir, "xdg-download"))
+         fx_dir = g_get_user_special_dir(G_USER_DIRECTORY_DOWNLOAD);
+-    if (!fx_dir) {
++    if (fx_dir) {
++        vdagent_file_xfers = vdagent_file_xfers_create(client, fx_dir,
++                                                       fx_open_dir, debug);
++    } else {
+         syslog(LOG_WARNING,
+-               "warning could not get file xfer save dir, using cwd");
+-        fx_dir = ".";
++               "warning could not get file xfer save dir, file transfers will be disabled");
++        vdagent_file_xfers = NULL;
+     }
+-    vdagent_file_xfers = vdagent_file_xfers_create(client, fx_dir,
+-                                                   fx_open_dir, debug);
+ 
+     while (client && !quit) {
+         FD_ZERO(&readfds);

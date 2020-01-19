@@ -1,0 +1,25 @@
+From aff972e4123aa9288a19c34d0e704972e29dd630 Mon Sep 17 00:00:00 2001
+From: Uri Lublin <uril@redhat.com>
+Date: Wed, 27 Nov 2013 18:38:07 +0200
+Subject: [PATCH] clipboard target_to_type: fix inner loop variable name
+
+(cherry picked from commit 29022fdc3b70d9cd4a89d5505be989b94aa466b3)
+
+https://bugzilla.redhat.com/show_bug.cgi?id=1117764
+---
+ src/vdagent-x11.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/src/vdagent-x11.c b/src/vdagent-x11.c
+index 8287421..8781d5e 100644
+--- a/src/vdagent-x11.c
++++ b/src/vdagent-x11.c
+@@ -753,7 +753,7 @@ static uint32_t vdagent_x11_target_to_type(struct vdagent_x11 *x11,
+     int i, j;
+ 
+     for (i = 0; i < clipboard_format_count; i++) {
+-        for (j = 0; j < x11->clipboard_formats[i].atom_count; i++) {
++        for (j = 0; j < x11->clipboard_formats[i].atom_count; j++) {
+             if (x11->clipboard_formats[i].atoms[j] == target) {
+                 return x11->clipboard_formats[i].type;
+             }

@@ -1,0 +1,169 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Victor Toso <victortoso@redhat.com>
+Date: Thu, 21 Apr 2016 10:32:50 +0200
+Subject: [PATCH] session-info: check if session belongs to user
+
+session-info back-ends such as console-kit and systemd-login have the
+concept of session's class which informs if session belongs to user or
+not [0]. We can disable features based on the session class.
+
+[0] Display-Managers are 'Greeter' and Display lock screens are
+'lock-screen'
+
+This patch introduces session_info_is_user() and disable file-xfer in
+case agent's session does not belong to the 'user' class. As the
+session-info data is hold by vdagentd, this patch also introduces
+VDAGENTD_FILE_XFER_DISABLE message to disable file-xfer that is done
+in vdagent.
+
+Resolves: https://bugzilla.redhat.com/show_bug.cgi?id=1328761
+
+Acked-by: Jonathon Jongsma <jjongsma@redhat.com>
+(cherry picked from commit 4c0e9c965e059ba2b884e66f0402e061a9d886a6)
+---
+ src/console-kit.c            |  6 ++++++
+ src/dummy-session-info.c     |  5 +++++
+ src/session-info.h           |  1 +
+ src/systemd-login.c          | 26 ++++++++++++++++++++++++++
+ src/vdagent.c                |  9 +++++++++
+ src/vdagentd-proto-strings.h |  1 +
+ src/vdagentd-proto.h         |  1 +
+ src/vdagentd.c               |  9 +++++++++
+ 8 files changed, 58 insertions(+)
+
+diff --git a/src/console-kit.c b/src/console-kit.c
+index 260fcc7..573ee49 100644
+--- a/src/console-kit.c
++++ b/src/console-kit.c
+@@ -359,3 +359,9 @@ gboolean session_info_session_is_locked(struct session_info *info)
+      * interface. */
+     return FALSE;
+ }
++
++gboolean session_info_is_user(struct session_info *info)
++{
++    /* TODO */
++    return TRUE;
++}
+diff --git a/src/dummy-session-info.c b/src/dummy-session-info.c
+index c09643b..0aa154e 100644
+--- a/src/dummy-session-info.c
++++ b/src/dummy-session-info.c
+@@ -49,3 +49,8 @@ gboolean session_is_locked(struct session_info *ck)
+ {
+     return FALSE;
+ }
++
++gboolean session_info_is_user(struct session_info *si)
++{
++    return TRUE;
++}
+diff --git a/src/session-info.h b/src/session-info.h
+index d660fcf..823749b 100644
+--- a/src/session-info.h
++++ b/src/session-info.h
+@@ -38,5 +38,6 @@ const char *session_info_get_active_session(struct session_info *ck);
+ char *session_info_session_for_pid(struct session_info *ck, uint32_t pid);
+ 
+ gboolean session_info_session_is_locked(struct session_info *si);
++gboolean session_info_is_user(struct session_info *si);
+ 
+ #endif
+diff --git a/src/systemd-login.c b/src/systemd-login.c
+index 4a365c0..ff9a3be 100644
+--- a/src/systemd-login.c
++++ b/src/systemd-login.c
+@@ -231,3 +231,29 @@ gboolean session_info_session_is_locked(struct session_info *si)
+     si_dbus_read_signals(si);
+     return si->session_is_locked;
+ }
++
++/* This function should only be called after session_info_get_active_session
++ * in order to verify if active session belongs to user (non greeter) */
++gboolean session_info_is_user(struct session_info *si)
++{
++    gchar *class = NULL;
++    gboolean ret;
++
++    g_return_val_if_fail (si != NULL, TRUE);
++    g_return_val_if_fail (si->session != NULL, TRUE);
++
++    if (sd_session_get_class(si->session, &class) != 0) {
++        syslog(LOG_WARNING, "Unable to get class from session: %s",
++               si->session);
++        return TRUE;
++    }
++
++    if (si->verbose)
++        syslog(LOG_DEBUG, "(systemd-login) class for %s is %s",
++               si->session, class);
++
++    ret = (g_strcmp0(class, "user") == 0);
++    g_free(class);
++
++    return ret;
++}
+diff --git a/src/vdagent.c b/src/vdagent.c
+index a0ba79e..f952ba1 100644
+--- a/src/vdagent.c
++++ b/src/vdagent.c
+@@ -108,6 +108,15 @@ void daemon_read_complete(struct udscs_connection **connp,
+         }
+         free(data);
+         break;
++    case VDAGENTD_FILE_XFER_DISABLE:
++        if (debug)
++            syslog(LOG_DEBUG, "Disabling file-xfers");
++
++        if (vdagent_file_xfers != NULL) {
++            vdagent_file_xfers_destroy(vdagent_file_xfers);
++            vdagent_file_xfers = NULL;
++        }
++        break;
+     case VDAGENTD_AUDIO_VOLUME_SYNC: {
+         VDAgentAudioVolumeSync *avs = (VDAgentAudioVolumeSync *)data;
+         if (avs->is_playback) {
+diff --git a/src/vdagentd-proto-strings.h b/src/vdagentd-proto-strings.h
+index a3fbd32..a56f380 100644
+--- a/src/vdagentd-proto-strings.h
++++ b/src/vdagentd-proto-strings.h
+@@ -34,6 +34,7 @@ static const char * const vdagentd_messages[] = {
+         "file xfer start",
+         "file xfer status",
+         "file xfer data",
++        "file xfer disable",
+         "client disconnected",
+ };
+ 
+diff --git a/src/vdagentd-proto.h b/src/vdagentd-proto.h
+index 0dbaaea..c1c39ad 100644
+--- a/src/vdagentd-proto.h
++++ b/src/vdagentd-proto.h
+@@ -40,6 +40,7 @@ enum {
+     VDAGENTD_FILE_XFER_START,
+     VDAGENTD_FILE_XFER_STATUS,
+     VDAGENTD_FILE_XFER_DATA,
++    VDAGENTD_FILE_XFER_DISABLE,
+     VDAGENTD_CLIENT_DISCONNECTED,  /* daemon -> client */
+     VDAGENTD_NO_MESSAGES /* Must always be last */
+ };
+diff --git a/src/vdagentd.c b/src/vdagentd.c
+index 2f77773..59ea8da 100644
+--- a/src/vdagentd.c
++++ b/src/vdagentd.c
+@@ -613,6 +613,15 @@ void update_active_session_connection(struct udscs_connection *new_conn)
+     active_session_conn = new_conn;
+     if (debug)
+         syslog(LOG_DEBUG, "%p is now the active session", new_conn);
++
++    if (active_session_conn && !session_info_is_user(session_info)) {
++        if (debug)
++            syslog(LOG_DEBUG, "New session agent does not belong to user: "
++                   "disabling file-xfer");
++        udscs_write(active_session_conn, VDAGENTD_FILE_XFER_DISABLE, 0, 0,
++                    NULL, 0);
++    }
++
+     if (active_session_conn && mon_config)
+         udscs_write(active_session_conn, VDAGENTD_MONITORS_CONFIG, 0, 0,
+                     (uint8_t *)mon_config, sizeof(VDAgentMonitorsConfig) +

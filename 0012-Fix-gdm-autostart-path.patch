@@ -1,0 +1,40 @@
+From 0758938a5bd824bdd081adf543d6cab927c6d358 Mon Sep 17 00:00:00 2001
+From: Christophe Fergeau <cfergeau@redhat.com>
+Date: Tue, 4 Feb 2014 17:57:17 +0100
+Subject: [PATCH] Fix gdm autostart path
+
+gdm 3.1.90 (June 2011) changed the path where .desktop files which should
+be autostarted with gdm needs to be located.
+This used to be $(datadir)/gdm/autostart/LoginWindow and is now
+$(datadir)/gdm/greeter/autostart.
+This means that when running gdm in a VM in a recent distribution,
+arbitrary resizing the VM window will not cause the resolution to be
+adjusted. This used to be working in eg RHEL6.
+
+This patch installs the .desktop file to both paths in order to work both
+with older and newer gdms.
+
+https://bugzilla.redhat.com/show_bug.cgi?id=1052172
+(cherry picked from commit 7d858d5064fd0c26454b72bf9fe3e0472f31e34f)
+---
+ Makefile.am | 5 ++++-
+ 1 file changed, 4 insertions(+), 1 deletion(-)
+
+diff --git a/Makefile.am b/Makefile.am
+index 5515ca0..8a65704 100644
+--- a/Makefile.am
++++ b/Makefile.am
+@@ -42,9 +42,12 @@ noinst_HEADERS = src/glib-compat.h \
+ xdgautostartdir = $(sysconfdir)/xdg/autostart
+ xdgautostart_DATA = $(top_srcdir)/data/spice-vdagent.desktop
+ 
+-gdmautostartdir = $(datadir)/gdm/autostart/LoginWindow
++gdmautostartdir = $(datadir)/gdm/greeter/autostart
+ gdmautostart_DATA = $(top_srcdir)/data/spice-vdagent.desktop
+ 
++gdmautostart2dir = $(datadir)/gdm/autostart/LoginWindow
++gdmautostart2_DATA = $(top_srcdir)/data/spice-vdagent.desktop
++
+ install-data-local:
+ 	$(mkdir_p) $(DESTDIR)$(localstatedir)/run/spice-vdagentd
+ 

@@ -1,0 +1,61 @@
+From 19f3f91c041ebc4e52e8d287ba6d9c66a85af0d0 Mon Sep 17 00:00:00 2001
+From: Hans de Goede <hdegoede@redhat.com>
+Date: Mon, 9 Sep 2013 15:50:39 +0200
+Subject: [PATCH] vdagent-x11: Release clipboard on client disconnect if owned
+ by client
+
+https://bugzilla.redhat.com/show_bug.cgi?id=1003977
+
+Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+---
+ src/vdagent-x11.c | 10 ++++++++++
+ src/vdagent-x11.h |  2 ++
+ src/vdagent.c     |  1 +
+ 3 files changed, 13 insertions(+)
+
+diff --git a/src/vdagent-x11.c b/src/vdagent-x11.c
+index 6a58532..8287421 100644
+--- a/src/vdagent-x11.c
++++ b/src/vdagent-x11.c
+@@ -1301,6 +1301,16 @@ void vdagent_x11_clipboard_release(struct vdagent_x11 *x11, uint8_t selection)
+     vdagent_x11_do_read(x11);
+ }
+ 
++void vdagent_x11_client_disconnected(struct vdagent_x11 *x11)
++{
++    int sel;
++
++    for (sel = 0; sel < VD_AGENT_CLIPBOARD_SELECTION_SECONDARY; sel++) {
++        if (x11->clipboard_owner[sel] == owner_client)
++            vdagent_x11_clipboard_release(x11, sel);
++    }
++}
++
+ /* Function used to determine the default location to save file-xfers,
+    xdg desktop dir or xdg download dir. We error on the save side and use a
+    whitelist approach, so any unknown desktops will end up with saving
+diff --git a/src/vdagent-x11.h b/src/vdagent-x11.h
+index baa4ce8..5d949f6 100644
+--- a/src/vdagent-x11.h
++++ b/src/vdagent-x11.h
+@@ -46,6 +46,8 @@ void vdagent_x11_clipboard_data(struct vdagent_x11 *x11, uint8_t selection,
+     uint32_t type, uint8_t *data, uint32_t size);
+ void vdagent_x11_clipboard_release(struct vdagent_x11 *x11, uint8_t selection);
+ 
++void vdagent_x11_client_disconnected(struct vdagent_x11 *x11);
++
+ int vdagent_x11_has_icons_on_desktop(struct vdagent_x11 *x11);
+ 
+ #endif
+diff --git a/src/vdagent.c b/src/vdagent.c
+index 10ebf6e..c5e09ff 100644
+--- a/src/vdagent.c
++++ b/src/vdagent.c
+@@ -103,6 +103,7 @@ void daemon_read_complete(struct udscs_connection **connp,
+         free(data);
+         break;
+     case VDAGENTD_CLIENT_DISCONNECTED:
++        vdagent_x11_client_disconnected(x11);
+         vdagent_file_xfers_destroy(vdagent_file_xfers);
+         vdagent_file_xfers = vdagent_file_xfers_create(client, fx_dir,
+                                                        fx_open_dir, debug);
