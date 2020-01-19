@@ -1,0 +1,43 @@
+From f3f132795fbbcbd890e30d98d1d3cfe2f7870347 Mon Sep 17 00:00:00 2001
+From: Christophe Fergeau <cfergeau@redhat.com>
+Date: Tue, 18 Dec 2018 13:46:01 +0100
+Subject: [PATCH] systemd: Remove unneded virtio-port dependencies
+
+The udev rule already adds SYSTEMD_WANTS=spice-vdagentd.socket
+to the relevant virtio devices, which automatically adds Wants=${device}
+to spice-vdagentd.socket (see 'systemctl show spice-vdagentd.socket').
+Adding a Requisite/After for these ports is at best redundant, and most
+likely wrong as this is causing boot time warnings:
+
+[ INFO ] dev-virtio\x2dports-com.redhat.spice.0.device is not active.
+[DEPEND] Dependency failed for Activation socket for spice guest agent daemon.
+
+https://bugzilla.redhat.com/show_bug.cgi?id=1545212
+
+Signed-off-by: Christophe Fergeau <cfergeau@redhat.com>
+(cherry picked from commit b07420eea0aaba1b9a375eac03c1dbb565287f11)
+
+Note:
+- Conflict due not having commit below. As this patch removes that,
+  not worth to backport it.
+
+    102b2e7 systemd: use "After" with "Requisite"
+---
+ data/spice-vdagentd.socket | 2 --
+ 1 file changed, 2 deletions(-)
+
+diff --git a/data/spice-vdagentd.socket b/data/spice-vdagentd.socket
+index e34a188..f14e662 100644
+--- a/data/spice-vdagentd.socket
++++ b/data/spice-vdagentd.socket
+@@ -1,7 +1,5 @@
+ [Unit]
+ Description=Activation socket for spice guest agent daemon
+-# only start the socket if the virtio port device exists
+-Requisite=dev-virtio\x2dports-com.redhat.spice.0.device
+ 
+ [Socket]
+ ListenStream=/var/run/spice-vdagentd/spice-vdagent-sock
+-- 
+2.20.1
+

@@ -1,6 +1,6 @@
 Name:           spice-vdagent
 Version:        0.14.0
-Release:        16%{?dist}
+Release:        18%{?dist}
 Summary:        Agent for Spice guests
 Group:          Applications/System
 License:        GPLv3+
@@ -39,6 +39,15 @@ Patch26: 0026-session-info-check-if-session-belongs-to-user.patch
 Patch27: 0027-systemd-login-check-for-LockedHint-property.patch
 Patch28: 0028-Add-systemd-socket-activation.patch
 Patch29: 0029-spice-vdagent.desktop-Change-autostart-to-WindowMana.patch
+Patch30: 0030-systemd-Remove-unneded-virtio-port-dependencies.patch
+Patch31: 0031-systemd-Remove-WantedBy-sockets.service-in-Install.patch
+Patch32: 0032-systemd-Update-path-in-unit-file.patch
+Patch33: 0033-udscs-Avoid-file-descriptor-leak.patch
+Patch34: 0034-x11-invalidate-requests-for-targets-on-grab-from-cli.patch
+Patch35: 0035-vdagent_x11_target_to_type-Improve-error-logging.patch
+Patch36: 0036-vdagent-x11-Turn-some-error-messages-into-debugging-.patch
+
+
 BuildRequires:  systemd-devel glib2-devel spice-protocol >= 0.12.6
 BuildRequires:  libpciaccess-devel libXrandr-devel libXinerama-devel
 BuildRequires:  libXfixes-devel systemd-units desktop-file-utils libtool
@@ -91,6 +100,13 @@ Features:
 %patch27 -p1
 %patch28 -p1
 %patch29 -p1
+%patch30 -p1
+%patch31 -p1
+%patch32 -p1
+%patch33 -p1
+%patch34 -p1
+%patch35 -p1
+%patch36 -p1
 autoreconf -fi
 
 
@@ -132,6 +148,18 @@ rm $RPM_BUILD_ROOT%{_sysconfdir}/modules-load.d/spice-vdagentd.conf
 
 
 %changelog
+* Mon Apr  8 2019 Victor Toso <victortoso@redhat.com> - 0.14.0-18
+- Fix clipboard logs on requests for targets on grab from client
+  Resolves: rhbz#1594876
+- Make some clipboard logs debug instead of error
+  Resolves: rhbz#1686008
+
+* Fri Mar 15 2019 Victor Toso <victortoso@redhat.com> - 0.14.0-17
+- Fix 'Dependency failed for Activation socket' message
+  Resolves: rhbz#1545212
+- Fix socket leak
+  Resolves: rhbz#1650596
+
 * Fri Sep  7 2018 Victor Toso <victortoso@redhat.com> - 0.14.0-16
 - Change session agent initialization stage to WindowManager
   Resolves: rhbz#1623947

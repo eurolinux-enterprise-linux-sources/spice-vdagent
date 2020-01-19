@@ -1,0 +1,72 @@
+From 3ff64705a7802e4944fcb5e7a027126127043bc8 Mon Sep 17 00:00:00 2001
+From: =?UTF-8?q?Jakub=20Jank=C5=AF?= <jjanku@redhat.com>
+Date: Thu, 21 Feb 2019 21:25:57 +0100
+Subject: [PATCH] x11: invalidate requests for targets on grab from client
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+If XSetSelectionOwner() is invoked during the time
+we are waiting for the requested clipboard targets,
+the targets we eventually receive are no longer valid.
+
+To solve this, ignore the same count of target notifications
+as we expected at the time we received grab from the client.
+
+Otherwise we end up in a situation when vdagent holds
+the clipboard grab in the guest but cannot provide data to the
+apps that request it - this can be observed in the log:
+
+    clipboard: received selection request event for target *, while not owning client clipboard
+
+Signed-off-by: Jakub Janků <jjanku@redhat.com>
+Acked-by: Victor Toso <victortoso@redhat.com>
+---
+ src/vdagent-x11-priv.h |  1 +
+ src/vdagent-x11.c      | 11 +++++++++++
+ 2 files changed, 12 insertions(+)
+
+diff --git a/src/vdagent-x11-priv.h b/src/vdagent-x11-priv.h
+index 38f852e..29018a3 100644
+--- a/src/vdagent-x11-priv.h
++++ b/src/vdagent-x11-priv.h
+@@ -97,6 +97,7 @@ struct vdagent_x11 {
+     int xfixes_event_base;
+     int max_prop_size;
+     int expected_targets_notifies[256];
++    int ignore_targets_notifies[256];
+     int clipboard_owner[256];
+     int clipboard_type_count[256];
+     uint32_t clipboard_agent_types[256][256];
+diff --git a/src/vdagent-x11.c b/src/vdagent-x11.c
+index 5ac2cf7..3d752c1 100644
+--- a/src/vdagent-x11.c
++++ b/src/vdagent-x11.c
+@@ -894,6 +894,12 @@ static void vdagent_x11_handle_targets_notify(struct vdagent_x11 *x11,
+ 
+     x11->expected_targets_notifies[selection]--;
+ 
++    if (x11->ignore_targets_notifies[selection] > 0) {
++        x11->ignore_targets_notifies[selection]--;
++        VSELPRINTF("ignoring selection notify TARGETS");
++        return;
++    }
++
+     /* If we have more targets_notifies pending, ignore this one, we
+        are only interested in the targets list of the current owner
+        (which is the last one we've requested a targets list from) */
+@@ -1194,6 +1200,11 @@ void vdagent_x11_clipboard_grab(struct vdagent_x11 *x11, uint8_t selection,
+                        x11->selection_window, CurrentTime);
+     vdagent_x11_set_clipboard_owner(x11, selection, owner_client);
+ 
++    /* If there're pending requests for targets, ignore the returned
++     * targets as the XSetSelectionOwner() call above made them invalid */
++    x11->ignore_targets_notifies[selection] =
++        x11->expected_targets_notifies[selection];
++
+     /* Flush output buffers and consume any pending events */
+     vdagent_x11_do_read(x11);
+ }
+-- 
+2.20.1
+

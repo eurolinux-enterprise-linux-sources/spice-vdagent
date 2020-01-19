@@ -1,0 +1,35 @@
+From 291e3fe366197c3958d3bb13486bee786a362d48 Mon Sep 17 00:00:00 2001
+From: Hans de Goede <hdegoede@redhat.com>
+Date: Thu, 8 Aug 2013 12:01:48 +0200
+Subject: [PATCH 35/36] vdagent_x11_target_to_type: Improve error logging
+
+Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+(cherry picked from commit bad87034bbed85e65e9b8fe479c967a3d0f9c861)
+---
+ src/vdagent-x11.c | 3 +++
+ 1 file changed, 3 insertions(+)
+
+diff --git a/src/vdagent-x11.c b/src/vdagent-x11.c
+index 3d752c1..e72fd24 100644
+--- a/src/vdagent-x11.c
++++ b/src/vdagent-x11.c
+@@ -833,6 +833,8 @@ static void vdagent_x11_handle_selection_notify(struct vdagent_x11 *x11,
+     selection = x11->conversion_req->selection;
+     type = vdagent_x11_target_to_type(x11, selection,
+                                       x11->conversion_req->target);
++    if (type == VD_AGENT_CLIPBOARD_NONE)
++        syslog(LOG_ERR, "internal error conversion_req has bad target");
+     if (len == 0) { /* No errors so far */
+         len = vdagent_x11_get_selection(x11, event, selection,
+                                         x11->conversion_req->target,
+@@ -1062,6 +1064,7 @@ static void vdagent_x11_handle_selection_request(struct vdagent_x11 *x11)
+     type = vdagent_x11_target_to_type(x11, selection,
+                                       event->xselectionrequest.target);
+     if (type == VD_AGENT_CLIPBOARD_NONE) {
++        syslog(LOG_ERR, "guest app requested a non-advertised target");
+         vdagent_x11_send_selection_notify(x11, None, NULL);
+         return;
+     }
+-- 
+2.20.1
+

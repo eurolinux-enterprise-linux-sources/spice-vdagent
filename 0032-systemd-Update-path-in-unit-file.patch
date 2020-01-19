@@ -1,0 +1,41 @@
+From b69bd2346b92f48546eb7824ead9688fb3f7af77 Mon Sep 17 00:00:00 2001
+From: Christian Hesse <mail@eworm.de>
+Date: Mon, 14 Jan 2019 12:12:00 +0100
+Subject: [PATCH] systemd: Update path in unit file
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+When loading the unit file, systemd 240 logs:
+
+systemd[1]: /usr/lib/systemd/system/spice-vdagentd.service:9: PIDFile=
+references path below legacy directory /var/run/, updating
+/var/run/spice-vdagentd/spice-vdagentd.pid →
+/run/spice-vdagentd/spice-vdagentd.pid; please update the unit file
+accordingly.
+
+So update the path.
+
+Signed-off-by: Christian Hesse <mail@eworm.de>
+Acked-by: Frediano Ziglio <fziglio@redhat.com>
+(cherry picked from commit 098268a33c7c8008ccec9050aea8f0763f1c06d5)
+---
+ data/spice-vdagentd.service | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/data/spice-vdagentd.service b/data/spice-vdagentd.service
+index 365b2c1..9c70b30 100644
+--- a/data/spice-vdagentd.service
++++ b/data/spice-vdagentd.service
+@@ -7,7 +7,7 @@ Requires=spice-vdagentd.socket
+ Type=forking
+ EnvironmentFile=-/etc/sysconfig/spice-vdagentd
+ ExecStart=/usr/sbin/spice-vdagentd $SPICE_VDAGENTD_EXTRA_ARGS
+-PIDFile=/var/run/spice-vdagentd/spice-vdagentd.pid
++PIDFile=/run/spice-vdagentd/spice-vdagentd.pid
+ PrivateTmp=true
+ Restart=on-failure
+ 
+-- 
+2.20.1
+
