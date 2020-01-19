@@ -1,6 +1,6 @@
 Name:           spice-vdagent
 Version:        0.14.0
-Release:        14%{?dist}
+Release:        15%{?dist}
 Summary:        Agent for Spice guests
 Group:          Applications/System
 License:        GPLv3+
@@ -37,6 +37,7 @@ Patch24: 0024-vdagentd-send-file-xfer-status-generic-version.patch
 Patch25: 0025-session-info-check-for-a-locked-session.patch
 Patch26: 0026-session-info-check-if-session-belongs-to-user.patch
 Patch27: 0027-systemd-login-check-for-LockedHint-property.patch
+Patch28: 0028-Add-systemd-socket-activation.patch
 BuildRequires:  systemd-devel glib2-devel spice-protocol >= 0.12.6
 BuildRequires:  libpciaccess-devel libXrandr-devel libXinerama-devel
 BuildRequires:  libXfixes-devel systemd-units desktop-file-utils libtool
@@ -87,6 +88,7 @@ Features:
 %patch25 -p1
 %patch26 -p1
 %patch27 -p1
+%patch28 -p1
 autoreconf -fi
 
 
@@ -102,20 +104,20 @@ rm $RPM_BUILD_ROOT%{_sysconfdir}/modules-load.d/spice-vdagentd.conf
 
 
 %post
-%systemd_post spice-vdagentd.service
+%systemd_post spice-vdagentd.service spice-vdagentd.socket
 
 %preun
-%systemd_preun spice-vdagentd.service
+%systemd_preun spice-vdagentd.service spice-vdagentd.socket
 
 %postun
-%systemd_postun_with_restart spice-vdagentd.service
+%systemd_postun_with_restart spice-vdagentd.service spice-vdagentd.socket
 
 
 %files
 %doc COPYING ChangeLog README TODO
 /lib/udev/rules.d/70-spice-vdagentd.rules
 %{_unitdir}/spice-vdagentd.service
-%{_unitdir}/spice-vdagentd.target
+%{_unitdir}/spice-vdagentd.socket
 %{_prefix}/lib/tmpfiles.d/spice-vdagentd.conf
 %{_bindir}/spice-vdagent
 %{_sbindir}/spice-vdagentd
@@ -128,6 +130,10 @@ rm $RPM_BUILD_ROOT%{_sysconfdir}/modules-load.d/spice-vdagentd.conf
 
 
 %changelog
+* Fri Nov 17 2017 Jonathon Jongsma <jjongsma@redhat.com> - 0.14.0-15
+- Add systemd socket activation
+  Resolves: rhbz#1340160
+
 * Fri Jul  8 2016 Victor Toso <victortoso@redhat.com> - 0.14.0-14
 - Do not allow drag-and-drop on (gdm) login screen
   Resolves: rhbz#1328761
