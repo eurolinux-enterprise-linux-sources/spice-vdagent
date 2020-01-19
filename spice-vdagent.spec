@@ -1,6 +1,6 @@
 Name:           spice-vdagent
 Version:        0.14.0
-Release:        14%{?dist}
+Release:        10%{?dist}
 Summary:        Agent for Spice guests
 Group:          Applications/System
 License:        GPLv3+
@@ -24,27 +24,12 @@ Patch11: 0011-Don-t-abort-if-XRRSetCrtcConfig-fails.patch
 Patch12: 0012-Fix-gdm-autostart-path.patch
 Patch13: 0013-data-remove-rsyslog-config-files.patch
 Patch14: 0014-vdagent-file-xfers-only-open-the-file-transfer-dir-w.patch
-Patch15: 0015-audio-add-functions-to-set-volume-mute-with-alsa.patch
-Patch16: 0016-vdagent-volume-synchronization-from-client.patch
-Patch17: 0017-vdagentd-proto-strings-Add-missing-string-for-VDAGEN.patch
-Patch18: 0018-vdagent-Return-1-when-virtio-device-cannot-be-opened.patch
-Patch19: 0019-build-sys-Enable-large-file-support.patch
-Patch20: 0020-Add-g_return_if_fail-guards-to-file-xfer-public-func.patch
-Patch21: 0021-Make-creation-of-vdagent_file_xfers-optional.patch
-Patch22: 0022-Disable-file-xfer-when-no-suitable-destination-dir.patch
-Patch23: 0023-Report-an-error-when-file-transfers-are-disabled.patch
-Patch24: 0024-vdagentd-send-file-xfer-status-generic-version.patch
-Patch25: 0025-session-info-check-for-a-locked-session.patch
-Patch26: 0026-session-info-check-if-session-belongs-to-user.patch
-Patch27: 0027-systemd-login-check-for-LockedHint-property.patch
 BuildRequires:  systemd-devel glib2-devel spice-protocol >= 0.12.6
 BuildRequires:  libpciaccess-devel libXrandr-devel libXinerama-devel
 BuildRequires:  libXfixes-devel systemd-units desktop-file-utils libtool
-BuildRequires:  alsa-lib-devel dbus-devel
 Requires(post): systemd-units
 Requires(preun): systemd-units
 Requires(postun): systemd-units
-Requires: dbus systemd >= 219-21
 
 %description
 Spice agent for Linux guests offering the following features:
@@ -74,19 +59,6 @@ Features:
 %patch12 -p1
 %patch13 -p1
 %patch14 -p1
-%patch15 -p1
-%patch16 -p1
-%patch17 -p1
-%patch18 -p1
-%patch19 -p1
-%patch20 -p1
-%patch21 -p1
-%patch22 -p1
-%patch23 -p1
-%patch24 -p1
-%patch25 -p1
-%patch26 -p1
-%patch27 -p1
 autoreconf -fi
 
 
@@ -128,26 +100,6 @@ rm $RPM_BUILD_ROOT%{_sysconfdir}/modules-load.d/spice-vdagentd.conf
 
 
 %changelog
-* Fri Jul  8 2016 Victor Toso <victortoso@redhat.com> - 0.14.0-14
-- Do not allow drag-and-drop on (gdm) login screen
-  Resolves: rhbz#1328761
-- Do not allow drag-and-drop on locked screen
-  Resolves: rhbz#1323623
-
-* Thu Apr 28 2016 Christophe Fergeau <cfergeau@redhat.com> - 0.14.0-13
-- Enable large file support
-  Resolves: rhbz#1331490
-
-* Thu Apr 28 2016 Christophe Fergeau <cfergeau@redhat.com> - 0.14.0-12
-- Apply patches forgotten in previous build..
-  Related: rhbz#1264102, rhbz#1256704
-
-* Thu Apr 28 2016 Christophe Fergeau <cfergeau@redhat.com> - 0.14.0-11
-- Add client to guest audio volume synchronization
-  Resolves: rhbz#1264102
-- Exit with error when virtio channel device is missing
-  Resolves: rhbz#1256704
-
 * Fri Jun 05 2015 Jonathon Jongsma <jjongsma@redhat.com> - 0.14.0-10
 - Don't open a separate file manager for each file transfered
   Resolves: rhbz#1168324
